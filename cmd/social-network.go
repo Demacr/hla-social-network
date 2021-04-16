@@ -26,6 +26,8 @@ func main() {
 	e := echo.New()
 	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
 
+	e.Static("/", "./frontend/dist")
+
 	e.POST("/api/registrate", func(c echo.Context) error {
 		profile := &models.Profile{}
 		if err := c.Bind(profile); err != nil {
