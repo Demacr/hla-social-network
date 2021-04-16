@@ -157,7 +157,7 @@ export default {
     },
     methods: {
         authorize(payload) {
-            const path = 'http://localhost:1323/api/authorize';
+            const path = `${process.env.API_HOST || ''}/api/authorize`;
             axios.post(path, payload)
                 .then(() => {
                     this.$router.push('/home');
@@ -169,7 +169,7 @@ export default {
                 );
         },
         registrate(payload) {
-            const path = 'http://localhost:1323/api/registrate';
+            const path = `${process.env.API_HOST || ''}/api/registrate`;
             axios.post(path, payload)
                 .catch((error) => {
                     // eslint-disable-next-line
