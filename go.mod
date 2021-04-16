@@ -4,7 +4,7 @@ go 1.16
 
 require (
 	github.com/VividCortex/mysqlerr v0.0.0-20201215173831-4c396ae82aac
-	github.com/caarlos0/env v3.5.0+incompatible
+	github.com/caarlos0/env/v6 v6.5.0
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/labstack/echo v3.3.10+incompatible
