@@ -17,7 +17,7 @@ RUN go mod tidy
 RUN go env
 RUN CGO_ENABLED=0 go build -a -o social-network cmd/social-network.go
 
-FROM alpine
+FROM scratch
 COPY --from=frontend /build/dist frontend/dist/
 COPY --from=backend /build/social-network .
 CMD ["./social-network"]
