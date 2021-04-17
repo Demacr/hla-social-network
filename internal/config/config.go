@@ -13,7 +13,7 @@ type Config struct {
 
 type MySQLConfig struct {
 	Host     string `env:"MYSQL_HOST"`
-	Login    string `env:"MYSQL_LOGIN"`
+	Login    string `env:"MYSQL_USER"`
 	Password string `env:"MYSQL_PASSWORD"`
 	Database string `env:"MYSQL_DATABASE"`
 }
