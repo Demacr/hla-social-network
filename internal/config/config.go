@@ -25,3 +25,11 @@ func Configure() (*Config, error) {
 	}
 	return config, nil
 }
+
+func MySQLConfigure() (*MySQLConfig, error) {
+	config := &MySQLConfig{}
+	if err := env.Parse(config); err != nil {
+		return nil, errors.Wrap(err, "error during parsing env variables")
+	}
+	return config, nil
+}

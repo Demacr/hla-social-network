@@ -59,6 +59,8 @@ func main() {
 		if !result {
 			return c.String(http.StatusInternalServerError, "Wrong credentials.")
 		}
+		// Success authorization
+
 		return c.String(http.StatusOK, "authorized!")
 	})
 

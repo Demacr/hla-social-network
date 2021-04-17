@@ -11,6 +11,7 @@ require (
 	github.com/labstack/gommon v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
 	github.com/pkg/errors v0.9.1
+	github.com/pressly/goose v2.7.0+incompatible
 	github.com/valyala/fasttemplate v1.2.1 // indirect
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/net v0.0.0-20210414194228-064579744ee0 // indirect
