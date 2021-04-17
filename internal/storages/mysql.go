@@ -23,12 +23,14 @@ type DB struct {
 // NewDB creates new DB struct
 //
 func NewDB(cfg *config.Config) *DB {
-	db, err := sql.Open("mysql", fmt.Sprintf("%s:%s@tcp(%s)/%s?autocommit=true",
+	dsn := fmt.Sprintf("%s:%s@%s/%s?autocommit=true",
 		cfg.MySQL.Login,
 		cfg.MySQL.Password,
 		cfg.MySQL.Host,
 		cfg.MySQL.Database,
-	))
+	)
+
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		panic(err)
 	}
