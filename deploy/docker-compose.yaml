@@ -1,0 +1,30 @@
+version: "3"
+services:
+  social-network:
+    image: social-network:latest
+    container_name: sn
+    ports:
+      - "8080:8080"
+    env_file: ../.env
+    restart: always
+    networks:
+      - sn-ext
+      - sn-net
+
+  mariadb:
+    image: mariadb:10.5.9
+    container_name: mariadb
+    env_file: ../.env
+    restart: always
+    networks:
+      - sn-net
+    volumes:
+      - social-network-db:/var/lib/mysql
+
+networks:
+  sn-ext:
+  sn-net:
+    internal: true
+
+volumes:
+  social-network-db:
