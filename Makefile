@@ -24,5 +24,9 @@ migrator:
 migrate: migrator
 	./migrator -dir migrations/ "${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}/${MYSQL_DATABASE}?parseTime=true" up
 
-clean:
-	rm social-network
+clean-bin:
+	rm social-network || true
+clean-migrator:
+	rm migrator || true
+
+clean: clean-bin clean-migrator
