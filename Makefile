@@ -14,15 +14,17 @@ run-front-local:
 social-network:
 	CGO_ENABLED=0 go build -a -o social-network cmd/social-network/social-network.go
 run-back-local: social-network
-	go run cmd/social-network.go
+	./social-network
 
 run:
-	docker run --env-file .env -p 8080:8080 social-network
+	docker run --env-file .env -p ${PORT}:${PORT} social-network
 
 migrator:
 	CGO_ENABLED=0 go build -a -o migrator cmd/migrator/migrator.go
 migrate: migrator
 	./migrator -dir migrations/ "${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}/${MYSQL_DATABASE}?parseTime=true" up
+migrate-down: migrator
+	./migrator -dir migrations/ "${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}/${MYSQL_DATABASE}?parseTime=true" down
 
 clean-bin:
 	rm social-network || true

@@ -159,7 +159,10 @@ export default {
         authorize(payload) {
             const path = `${process.env.API_HOST || ''}/api/authorize`;
             axios.post(path, payload)
-                .then(() => {
+                .then((result) => {
+                    localStorage.setItem('token', result.data.token);
+                    // eslint-disable-next-line
+                    console.log(result);
                     this.$router.push('/home');
                 })
                 .catch((error) => {

@@ -3,13 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
-
-	"github.com/pkg/errors"
 
 	"github.com/Demacr/otus-hl-socialnetwork/internal/config"
-	"github.com/Demacr/otus-hl-socialnetwork/internal/models"
+	"github.com/Demacr/otus-hl-socialnetwork/internal/controller"
 	"github.com/Demacr/otus-hl-socialnetwork/internal/storages"
+	"github.com/Demacr/otus-hl-socialnetwork/internal/usecase"
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
@@ -21,48 +19,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	storage := storages.NewDB(config)
-
 	e := echo.New()
 	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
 
-	e.Static("/", "./frontend/dist")
+	e.Use(middleware.StaticWithConfig(middleware.StaticConfig{
+		Root:   "./frontend/dist",
+		HTML5:  true,
+		Browse: false,
+	}))
 
-	e.POST("/api/registrate", func(c echo.Context) error {
-		profile := &models.Profile{}
-		if err := c.Bind(profile); err != nil {
-			return err
-		}
+	snRepo := storages.NewMysqlSocialNetworkRepository(&config.MySQL)
+	snuc := usecase.NewSocialNetworkUsecase(snRepo)
 
-		err := storage.WriteProfile(profile)
-		if err != nil {
-			log.Println("WriteProfile error:", err)
-			return c.String(http.StatusInternalServerError, "")
-		}
-
-		return c.String(http.StatusCreated, "")
-	})
-
-	e.POST("/api/authorize", func(c echo.Context) error {
-		credentials := &models.Credentials{}
-		if err := c.Bind(credentials); err != nil {
-			log.Println(err)
-			return c.String(http.StatusBadRequest, "Bad json.")
-		}
-
-		result, err := storage.CheckCredentials(credentials)
-		if err != nil {
-			err = errors.Wrap(err, "Authorization failed")
-			log.Println(err)
-			return c.String(http.StatusInternalServerError, "Check credentials error.")
-		}
-		if !result {
-			return c.String(http.StatusInternalServerError, "Wrong credentials.")
-		}
-		// Success authorization
-
-		return c.String(http.StatusOK, "authorized!")
-	})
+	controller.NewSocialNetworkHandler(e, snuc, config.JWTSecret)
 
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", config.Port)))
 }

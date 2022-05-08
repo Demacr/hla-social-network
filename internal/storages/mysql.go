@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/Demacr/otus-hl-socialnetwork/internal/config"
-	"github.com/Demacr/otus-hl-socialnetwork/internal/models"
+	"github.com/Demacr/otus-hl-socialnetwork/internal/domain"
 	"github.com/VividCortex/mysqlerr"
 	"github.com/go-sql-driver/mysql"
 	"golang.org/x/crypto/bcrypt"
@@ -16,36 +16,36 @@ import (
 
 // DB struct contains sql.DB pointer of MySQL database
 //
-type DB struct {
-	db *sql.DB
+type mysqlSocialNetworkRepository struct {
+	Conn *sql.DB
 }
 
 // NewDB creates new DB struct
 //
-func NewDB(cfg *config.Config) *DB {
+func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepository {
 	dsn := fmt.Sprintf("%s:%s@%s/%s?autocommit=true",
-		cfg.MySQL.Login,
-		cfg.MySQL.Password,
-		cfg.MySQL.Host,
-		cfg.MySQL.Database,
+		cfg.Login,
+		cfg.Password,
+		cfg.Host,
+		cfg.Database,
 	)
 
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		panic(err)
 	}
-	return &DB{db: db}
+	return &mysqlSocialNetworkRepository{Conn: db}
 }
 
 // WriteProfile writes to DB registration profile
 //
-func (db *DB) WriteProfile(profile *models.Profile) error {
+func (m *mysqlSocialNetworkRepository) WriteProfile(profile *domain.Profile) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.MinCost)
 	if err != nil {
 		log.Println(err)
 	}
 
-	result, err := db.db.Exec("INSERT INTO users(name, surname, age, sex, interests, city, email, password) VALUES(?, ?, ?, ?, ?, ?, ?, ?);",
+	result, err := m.Conn.Exec("INSERT INTO users(name, surname, age, sex, interests, city, email, password) VALUES(?, ?, ?, ?, ?, ?, ?, ?);",
 		profile.Name,
 		profile.Surname,
 		profile.Age,
@@ -71,10 +71,48 @@ func (db *DB) WriteProfile(profile *models.Profile) error {
 	return nil
 }
 
+func (m *mysqlSocialNetworkRepository) GetProfileByEmail(email string) (*domain.Profile, error) {
+	var profile domain.Profile
+	err := m.Conn.QueryRow("SELECT id, name, surname, age, sex, city, interests FROM users WHERE email = ?", email).Scan(
+		&profile.ID,
+		&profile.Name,
+		&profile.Surname,
+		&profile.Age,
+		&profile.Sex,
+		&profile.City,
+		&profile.Interests,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetProfileByEmail")
+	}
+
+	return &profile, err
+}
+
+func (m *mysqlSocialNetworkRepository) GetRelatedProfileById(id, related_id int) (*domain.RelatedProfile, error) {
+	var profile domain.RelatedProfile
+	err := m.Conn.QueryRow("SELECT id, name, surname, age, sex, city, interests, IFNULL((SELECT true from friendship where id1=? and id2=?), false), IFNULL((SELECT true from friendship_requests where id_from=? and id_to=?), false) FROM users WHERE id = ?", related_id, id, related_id, id, id).Scan(
+		&profile.ID,
+		&profile.Name,
+		&profile.Surname,
+		&profile.Age,
+		&profile.Sex,
+		&profile.City,
+		&profile.Interests,
+		&profile.IsFriend,
+		&profile.IsRequestSent,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "GetRelatedProfileById")
+	}
+
+	return &profile, nil
+}
+
 // CheckCredentials checks valid credentials or not
-func (db *DB) CheckCredentials(credentials *models.Credentials) (bool, error) {
+func (m *mysqlSocialNetworkRepository) CheckCredentials(credentials *domain.Credentials) (bool, error) {
 	var hashedPassword string
-	err := db.db.QueryRow("SELECT password FROM users WHERE email = ?", credentials.Email).Scan(&hashedPassword)
+	err := m.Conn.QueryRow("SELECT password FROM users WHERE email = ?", credentials.Email).Scan(&hashedPassword)
 	if err != nil {
 		return false, errors.Wrap(err, "CheckCredentials: No user found")
 	}
@@ -82,6 +120,137 @@ func (db *DB) CheckCredentials(credentials *models.Credentials) (bool, error) {
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(credentials.Password))
 	if err != nil {
 		return false, errors.Wrap(err, "CheckCredentials: Login or password mismatched")
+	}
+
+	return true, nil
+}
+
+func (m *mysqlSocialNetworkRepository) CreateFriendRequest(id, friend_id int) (bool, error) {
+	// TODO: check cross-request
+	result, err := m.Conn.Exec("INSERT INTO friendship_requests(id_from, id_to) VALUES(?, ?)", id, friend_id)
+	if err != nil {
+		// Check duplicate email error
+		if driverErr, ok := err.(*mysql.MySQLError); ok {
+			if driverErr.Number == mysqlerr.ER_DUP_ENTRY {
+				return false, nil
+			}
+		}
+		wrapped_error := errors.Wrap(err, "request exists")
+		log.Println(wrapped_error)
+		return false, wrapped_error
+	}
+
+	if _, err := result.RowsAffected(); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func (m *mysqlSocialNetworkRepository) GetRandomProfiles(exclude_id int) ([]domain.Profile, error) {
+	result := make([]domain.Profile, 0, 10)
+
+	// SELECT * from (SELECT id, name, surname, age, sex, city, interests FROM users ORDER BY rand() LIMIT 10) u left join friendship on u.id = friendship.id1 left join (select * from friendship_requests where id_from = 3) fr on u.id=fr.id_to;
+	profiles, err := m.Conn.Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE id != ? ORDER BY rand() LIMIT 10", exclude_id)
+	if err != nil {
+		return nil, errors.Wrap(err, "error during select random profiles")
+	}
+
+	for profiles.Next() {
+		profile := domain.Profile{}
+		if err = profiles.Scan(
+			&profile.ID,
+			&profile.Name,
+			&profile.Surname,
+			&profile.Age,
+			&profile.Sex,
+			&profile.City,
+			&profile.Interests,
+		); err != nil {
+			return nil, errors.Wrap(err, "error during scan random profile")
+		}
+
+		result = append(result, profile)
+	}
+
+	return result, nil
+}
+
+func (m *mysqlSocialNetworkRepository) GetFriendRequests(id int) ([]domain.FriendRequest, error) {
+	result := []domain.FriendRequest{}
+
+	fr, err := m.Conn.Query("SELECT id_from FROM friendship_requests WHERE id_to = ?", id)
+	if err != nil {
+		return nil, errors.Wrap(err, "error during select friend requests")
+	}
+
+	for fr.Next() {
+		req := domain.FriendRequest{}
+		if err = fr.Scan(
+			&req.FriendID,
+		); err != nil {
+			return nil, errors.Wrap(err, "error during scan friend requests")
+		}
+
+		result = append(result, req)
+	}
+
+	return result, nil
+}
+
+func (m *mysqlSocialNetworkRepository) AcceptFriendship(id, friend_id int) (bool, error) {
+	tx, err := m.Conn.Begin()
+	if err != nil {
+		return false, errors.Wrap(err, "creating transaction in accepting friendship")
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	delete_result, err := tx.Exec("DELETE FROM friendship_requests WHERE id_from = ? AND id_to = ?", friend_id, id)
+	if err != nil {
+		return false, errors.Wrap(err, "deleting request in accepting friendship")
+	}
+
+	rows, err := delete_result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "getting affected rows in accepting friendship")
+	}
+	if rows != 1 {
+		return false, nil
+	}
+
+	_, err = tx.Exec("INSERT INTO friendship(id1, id2) VALUES(?, ?)", friend_id, id)
+	if err != nil {
+		return false, errors.Wrap(err, "adding friend in accepting friendship")
+	}
+
+	_, err = tx.Exec("INSERT INTO friendship(id2, id1) VALUES(?, ?)", friend_id, id)
+	if err != nil {
+		return false, errors.Wrap(err, "adding friend in accepting friendship")
+	}
+
+	if err = tx.Commit(); err != nil {
+		return false, errors.Wrap(err, "commiting in accepting friendship")
+	}
+
+	return true, nil
+}
+
+func (m *mysqlSocialNetworkRepository) DeclineFriendship(id, friend_id int) (bool, error) {
+	delete_result, err := m.Conn.Exec("DELETE FROM friendship_requests WHERE id_from = ? AND id_to = ?", friend_id, id)
+	if err != nil {
+		return false, errors.Wrap(err, "deleting request in declining friendship")
+	}
+
+	rows, err := delete_result.RowsAffected()
+	if err != nil {
+		return false, errors.Wrap(err, "getting affected rows in accepting friendship")
+	}
+	if rows != 1 {
+		return false, nil
 	}
 
 	return true, nil

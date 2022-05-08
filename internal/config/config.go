@@ -6,9 +6,10 @@ import (
 )
 
 type Config struct {
-	Host  string `env:"HOST" envDefault:"localhost"`
-	Port  int    `env:"PORT" envDefault:"8080"`
-	MySQL MySQLConfig
+	Host      string `env:"HOST" envDefault:"localhost"`
+	Port      int    `env:"PORT" envDefault:"8080"`
+	JWTSecret string `env:"JWT_SECRET,required"`
+	MySQL     MySQLConfig
 }
 
 type MySQLConfig struct {
