@@ -12,7 +12,7 @@ type Profile struct {
 	Sex       string `json:"sex,omitempty"       faker:"oneof: m, f"`
 	Interests string `json:"interests,omitempty" faker:"paragraph"`
 	City      string `json:"city,omitempty"      faker:"word"`
-	Email     string `json:"email,omitempty"     faker:"email,unique"`
+	Email     string `json:"email,omitempty"     faker:"email"`
 	Password  string `json:"password,omitempty"  faker:"password"`
 }
 
