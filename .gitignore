@@ -1,6 +1,8 @@
 .env*
 !*.example
 
+.DS_Store
+
 preparation.sql
 
 _frontend/
