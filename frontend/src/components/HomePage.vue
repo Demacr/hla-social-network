@@ -72,7 +72,7 @@
 import axios from 'axios';
 
 export default {
-  name: 'Home',
+  name: 'HomePage',
   data() {
     return {
       me: {},
@@ -83,7 +83,7 @@ export default {
   },
   methods: {
     getMyInfo() {
-      const path = `${process.env.API_HOST || ''}/api/account/myinfo`;
+      const path = `${process.env.VUE_APP_API_HOST || ''}/api/account/myinfo`;
       return axios.get(
         path,
         {
@@ -102,7 +102,7 @@ export default {
         );
     },
     getAccountInfo(id) {
-      const path = `${process.env.API_HOST || ''}/api/account/profile/${id}`;
+      const path = `${process.env.VUE_APP_API_HOST || ''}/api/account/profile/${id}`;
       return axios.get(
         path,
         {
@@ -118,7 +118,7 @@ export default {
       });
     },
     getMyFriendRequests() {
-      const path = `${process.env.API_HOST || ''}/api/account/my_friend_requests`;
+      const path = `${process.env.VUE_APP_API_HOST || ''}/api/account/my_friend_requests`;
       axios.get(
         path,
         {
@@ -144,7 +144,7 @@ export default {
       });
     },
     friendshipAccept(id, index) {
-      const path = `${process.env.API_HOST || ''}/api/account/friendship_request_accept`;
+      const path = `${process.env.VUE_APP_API_HOST || ''}/api/account/friendship_request_accept`;
       return axios.post(
         path,
         {
@@ -165,7 +165,7 @@ export default {
       });
     },
     friendshipDecline(id, index) {
-      const path = `${process.env.API_HOST || ''}/api/account/friendship_request_decline`;
+      const path = `${process.env.VUE_APP_API_HOST || ''}/api/account/friendship_request_decline`;
       return axios.post(
         path,
         {

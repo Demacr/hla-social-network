@@ -1,0 +1,349 @@
+{
+	"info": {
+		"_postman_id": "0bf5a3c9-052f-4184-adcc-7586304b9ca8",
+		"name": "HLA",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Account (auth required)",
+			"item": [
+				{
+					"name": "My Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/account/myinfo",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"account",
+								"myinfo"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get My Friend Requests",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/account/my_friend_requests",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"account",
+								"my_friend_requests"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Someone's Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/account/profile/:id",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"account",
+								"profile",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": ""
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Random People",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/account/getpeople",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"account",
+								"getpeople"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Profiles By Prefixes",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/account/search?firstName=D&lastName=K",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"account",
+								"search"
+							],
+							"query": [
+								{
+									"key": "firstName",
+									"value": "D"
+								},
+								{
+									"key": "lastName",
+									"value": "K"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Friendship Request",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"friendID\": {{friendID}}\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/account/friend_request",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"account",
+								"friend_request"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Friendship Request Accept",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"friendID\": {{friendID}}\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/account/friendship_request_accept",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"account",
+								"friendship_request_accept"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Friendship Request Decline",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"friendID\": {{friendID}}\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/account/friendship_request_decline",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"account",
+								"friendship_request_decline"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "bearer",
+				"bearer": [
+					{
+						"key": "token",
+						"value": "{{TOKEN}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var response = JSON.parse(responseBody);",
+							"",
+							"postman.setEnvironmentVariable(\"TOKEN\", response.token);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{Host}}:{{Port}}/api/authorize",
+					"host": [
+						"{{Host}}"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"api",
+						"authorize"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Registrate",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"{{name}}\",\n    \"surname\": \"{{surname}}\",\n    \"age\": {{age}},\n    \"sex\": \"{{sex}}\",\n    \"interests\": \"{{interests}}\",\n    \"city\": \"{{city}}\",\n    \"email\": \"{{email}}\",\n    \"password\": \"{{password}}\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "{{Host}}:{{Port}}/api/registrate",
+					"host": [
+						"{{Host}}"
+					],
+					"port": "{{Port}}",
+					"path": [
+						"api",
+						"registrate"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "Host",
+			"value": "localhost",
+			"type": "default"
+		},
+		{
+			"key": "Port",
+			"value": "8080",
+			"type": "default"
+		}
+	]
+}

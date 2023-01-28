@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/Demacr/otus-hl-socialnetwork/internal/domain"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/golang-jwt/jwt"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/pkg/errors"
 )
 
@@ -40,6 +40,7 @@ func NewSocialNetworkHandler(e *echo.Echo, snuc domain.SocialNetworkUsecase, JWT
 	r.POST("/friendship_request_decline", handler.FriendshipRequestDecline)
 	r.GET("/my_friend_requests", handler.GetFriendshipRequests)
 	r.GET("/profile/:id", handler.GetRelatedProfile)
+	r.GET("/search", handler.GetProfilesBySearchPrefixes)
 }
 
 func (h *SocialNetworkHandler) Registrate(c echo.Context) error {
@@ -69,7 +70,7 @@ func (h *SocialNetworkHandler) Authorize(c echo.Context) error {
 
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
-	claims["exp"] = time.Now().Add(time.Minute * 30).Unix()
+	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
 	claims["id"] = profile.ID
 	claims["email"] = credentials.Email
 
@@ -193,6 +194,31 @@ func (h *SocialNetworkHandler) GetRelatedProfile(c echo.Context) error {
 	if err != nil {
 		log.Println(err)
 		return c.String(http.StatusInternalServerError, "Can't get profile info")
+	}
+
+	return c.JSON(http.StatusOK, result)
+}
+
+func (h *SocialNetworkHandler) GetProfilesBySearchPrefixes(c echo.Context) error {
+	fn := ""
+	ln := ""
+	err := echo.QueryParamsBinder(c).
+		String("firstName", &fn).
+		String("lastName", &ln).
+		BindError()
+	if err != nil {
+		log.Println(errors.Wrap(err, "searching profiles error"))
+		return c.String(http.StatusBadRequest, "Bad request")
+	}
+
+	result, err := h.SNUsecase.GetProfilesBySearchPrefixes(fn, ln)
+	if err != nil {
+		log.Println(err)
+		return c.String(http.StatusInternalServerError, "Can't get searched profiles")
+	}
+
+	if len(result) == 0 {
+		return c.JSON(http.StatusNoContent, nil)
 	}
 
 	return c.JSON(http.StatusOK, result)

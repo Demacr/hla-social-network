@@ -1,19 +1,19 @@
 package domain
 
 import (
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 )
 
 type Profile struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Surname   string `json:"surname"`
-	Age       int    `json:"age"`
-	Sex       string `json:"sex"`
-	Interests string `json:"interests"`
-	City      string `json:"city"`
-	Email     string `json:"email"`
-	Password  string `json:"password"`
+	ID        int    `json:"id"                  faker:"-"`
+	Name      string `json:"name,omitempty"      faker:"first_name"`
+	Surname   string `json:"surname,omitempty"   faker:"last_name"`
+	Age       int    `json:"age,omitempty"       faker:"boundary_start=18, boundary_end=60"`
+	Sex       string `json:"sex,omitempty"       faker:"oneof: m, f"`
+	Interests string `json:"interests,omitempty" faker:"paragraph"`
+	City      string `json:"city,omitempty"      faker:"word"`
+	Email     string `json:"email,omitempty"     faker:"email,unique"`
+	Password  string `json:"password,omitempty"  faker:"password"`
 }
 
 type RelatedProfile struct {
@@ -41,6 +41,7 @@ type SocialNetworkUsecase interface {
 	Authorize(*Credentials) (*Profile, error)
 	GetProfileInfo(string) (*Profile, error)
 	GetRandomProfiles(int) ([]Profile, error)
+	GetProfilesBySearchPrefixes(string, string) ([]Profile, error)
 	CreateFriendRequest(int, int) error
 	FriendshipRequestAccept(int, int) error
 	FriendshipRequestDecline(int, int) error

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -12,6 +13,12 @@ import (
 	"github.com/VividCortex/mysqlerr"
 	"github.com/go-sql-driver/mysql"
 	"golang.org/x/crypto/bcrypt"
+)
+
+var (
+	MAX_OPEN_CONNECTIONS int           = 150
+	MAX_IDLE_CONNECTIONS int           = 150
+	CONNECTION_IDLE_TIME time.Duration = time.Minute * 5
 )
 
 // DB struct contains sql.DB pointer of MySQL database
@@ -23,7 +30,7 @@ type mysqlSocialNetworkRepository struct {
 // NewDB creates new DB struct
 //
 func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepository {
-	dsn := fmt.Sprintf("%s:%s@%s/%s?autocommit=true",
+	dsn := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true",
 		cfg.Login,
 		cfg.Password,
 		cfg.Host,
@@ -34,6 +41,15 @@ func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepos
 	if err != nil {
 		panic(err)
 	}
+	if err = db.Ping(); err != nil {
+		panic(err)
+	}
+
+	// Configure pool
+	db.SetMaxOpenConns(MAX_OPEN_CONNECTIONS)
+	db.SetMaxIdleConns(MAX_IDLE_CONNECTIONS)
+	db.SetConnMaxIdleTime(CONNECTION_IDLE_TIME)
+
 	return &mysqlSocialNetworkRepository{Conn: db}
 }
 
@@ -168,6 +184,38 @@ func (m *mysqlSocialNetworkRepository) GetRandomProfiles(exclude_id int) ([]doma
 			&profile.Interests,
 		); err != nil {
 			return nil, errors.Wrap(err, "error during scan random profile")
+		}
+
+		result = append(result, profile)
+	}
+
+	return result, nil
+}
+
+func (m *mysqlSocialNetworkRepository) GetProfilesBySearchPrefixes(first_name string, last_name string) ([]domain.Profile, error) {
+	result := []domain.Profile{}
+
+	profiles, err := m.Conn.Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE name LIKE ? AND surname LIKE ? ORDER BY id ASC",
+		first_name+"%",
+		last_name+"%",
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "error during searching profiles")
+	}
+
+	defer profiles.Close()
+	for profiles.Next() {
+		profile := domain.Profile{}
+		if err = profiles.Scan(
+			&profile.ID,
+			&profile.Name,
+			&profile.Surname,
+			&profile.Age,
+			&profile.Sex,
+			&profile.City,
+			&profile.Interests,
+		); err != nil {
+			return nil, errors.Wrap(err, "error during scan searched profiles")
 		}
 
 		result = append(result, profile)

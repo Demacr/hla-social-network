@@ -1,7 +1,9 @@
-.env
+.env*
+!*.example
 
 preparation.sql
 
+_frontend/
 /frontend/.DS_Store
 /frontend/node_modules/
 /frontend/dist/
