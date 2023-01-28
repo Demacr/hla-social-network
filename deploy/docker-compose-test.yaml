@@ -4,10 +4,6 @@ services:
   mariadb:
     volumes:
       - social-network-db-test:/var/lib/mysql
-    ports:
-      - "3306:3306"
-    networks:
-      - sn-ext
 
 volumes:
   social-network-db-test:

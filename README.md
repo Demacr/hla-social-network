@@ -6,8 +6,9 @@
 make build-docker
 ```
 ### Prepare environment
-You need to copy `.env.docker.example` and modify(or keep default) envrionment variables.
+You need to copy `.env*.example` and modify(or keep default) envrionment variables.
 ```bash
+cp .env.example .env
 cp .env.docker.example .env.docker
 vim .env.docker
 ```
