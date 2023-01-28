@@ -5,16 +5,20 @@ services:
     container_name: sn
     ports:
       - "8080:8080"
-    env_file: ../.env
+    env_file: ../.env.docker
     restart: always
     networks:
       - sn-ext
       - sn-net
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   mariadb:
     image: mariadb:10.5.9
     container_name: mariadb
-    env_file: ../.env
+    env_file: ../.env.docker
     restart: always
     networks:
       - sn-net

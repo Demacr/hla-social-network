@@ -17,6 +17,9 @@ func NewSocialNetworkUsecase(snRepo storages.SocialNetworkRepository) domain.Soc
 }
 
 func (sn *socialNetworkUsecase) Registrate(profile *domain.Profile) error {
+	if profile.Email == "" && profile.Password == "" {
+		return errors.New("email or password missed")
+	}
 	err := sn.repo.WriteProfile(profile)
 	if err != nil {
 		err = errors.Wrap(err, "creating profile")
@@ -52,6 +55,15 @@ func (sn *socialNetworkUsecase) GetRandomProfiles(id int) ([]domain.Profile, err
 	result, err := sn.repo.GetRandomProfiles(id)
 	if err != nil {
 		err = errors.Wrap(err, "getting random profiles")
+		return nil, err
+	}
+	return result, nil
+}
+
+func (sn *socialNetworkUsecase) GetProfilesBySearchPrefixes(first_name string, last_name string) ([]domain.Profile, error) {
+	result, err := sn.repo.GetProfilesBySearchPrefixes(first_name, last_name)
+	if err != nil {
+		err = errors.Wrap(err, "searching profiles")
 		return nil, err
 	}
 	return result, nil

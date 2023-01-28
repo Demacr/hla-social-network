@@ -9,6 +9,7 @@ type SocialNetworkRepository interface {
 	CheckCredentials(credentials *domain.Credentials) (bool, error)
 	CreateFriendRequest(id, friend_id int) (bool, error)
 	GetRandomProfiles(exclude_id int) ([]domain.Profile, error)
+	GetProfilesBySearchPrefixes(first_name string, last_name string) ([]domain.Profile, error)
 	GetFriendRequests(id int) ([]domain.FriendRequest, error)
 	AcceptFriendship(id, friend_id int) (bool, error)
 	DeclineFriendship(id, friend_id int) (bool, error)

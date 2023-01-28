@@ -1,27 +1,43 @@
-// The Vue build version to load with the `import` command
-// (runtime-only or standalone) has been set in webpack.base.conf with an alias.
 import 'bootstrap/dist/css/bootstrap.css';
-import BootstapVue from 'bootstrap-vue';
-import Axios from 'axios';
-import Vue from 'vue';
-import App from './App';
+import 'primevue/resources/themes/saga-blue/theme.css';
+import 'primevue/resources/primevue.min.css';
+import 'primeflex/primeflex.min.css';
+import 'primeicons/primeicons.css';
+import { createApp } from 'vue';
+// import Axios from 'axios';
+import App from './App.vue';
 import router from './router';
+import PrimeVue from 'primevue/config';
 
-Vue.prototype.$http = Axios;
+import Button from 'primevue/button';
+import CheckBox from 'primevue/checkbox';
+import Column from 'primevue/column';
+import DataTable from 'primevue/datatable';
+import Dialog from 'primevue/dialog';
+import InputNumber from 'primevue/inputnumber';
+import InputText from 'primevue/inputtext';
+import RadioButton from 'primevue/radiobutton';
 
-const token = localStorage.getItem('token');
+// const token = localStorage.getItem('token');
 
-Vue.config.productionTip = false;
-if (token) {
-  Vue.prototype.$http.defaults.headers.common.Authorization = token;
-}
+const app = createApp(App);
 
-Vue.use(BootstapVue);
-
-/* eslint-disable no-new */
-new Vue({
-  el: '#app',
-  router,
-  components: { App },
-  template: '<App/>',
-});
+app.use(router);
+app.use(PrimeVue);
+app.component('InputNumber', InputNumber);
+app.component('InputText', InputText);
+// eslint-disable-next-line
+app.component('Button', Button);
+// eslint-disable-next-line
+app.component('Checkbox', CheckBox);
+// eslint-disable-next-line
+app.component('Column', Column);
+app.component('DataTable', DataTable);
+// eslint-disable-next-line
+app.component('Dialog', Dialog);
+app.component('RadioButton', RadioButton);
+app.mount('#app');
+// app.config.globalProperties.$http = Axios;
+// if (token) {
+//     app.config.globalProperties.$http.defaults.headers.common.Authorization = token;
+// }
