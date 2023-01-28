@@ -79,6 +79,7 @@ func worker(count *int64, wg *sync.WaitGroup, db *sql.DB, mx *sync.Mutex) {
 		mx.Unlock()
 		if err := AddRecordToDB(db, p); err != nil {
 			log.Println(err)
+			continue
 		}
 		atomic.AddInt64(count, 1)
 	}
