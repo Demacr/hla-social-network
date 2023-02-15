@@ -81,7 +81,7 @@ lastNames = {
 -- Search by firstname and lastname
 request = function()
     wrk.path = "/api/account/search?firstName=" .. firstNames[math.random(#firstNames)] .. "&lastName=" .. lastNames[math.random(#lastNames)]
-    wrk.headers["Authorization"] = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImRrQGRrLmRrIiwiZXhwIjoxNjUzMTQ5ODEyLCJpZCI6MTAyMDUxOH0.32okv6d6bttbx0FBQrwIYvzi4sCKH7ovBcdVBDbWsww"
+    wrk.headers["Authorization"] = os.getenv("WRK_AUTH")
     return wrk.format("GET", wrk.path, wrk.headers)
 end
 
