@@ -10,18 +10,21 @@ import (
 	"sync/atomic"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
-	"golang.org/x/crypto/bcrypt"
-
 	"github.com/Demacr/otus-hl-socialnetwork/internal/domain"
-
 	"github.com/bxcodec/faker/v3"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	flags             = flag.NewFlagSet("db-lt-generator", flag.ExitOnError)
-	WORKERS           = *flags.Int("workers", 4, "Number of workers")
-	RECORD_PER_WORKER = *flags.Int("records", 250000, "Number of records per worker")
+	flags           = flag.NewFlagSet("db-lt-generator", flag.ExitOnError)
+	Workers         = *flags.Int("workers", 4, "Number of workers")
+	RecordPerWorker = *flags.Int("records", 250000, "Number of records per worker")
+)
+
+const (
+	Timer = 10 * time.Second
 )
 
 func main() {
@@ -29,10 +32,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	args := flags.Args()
 
 	if len(args) < 1 {
 		flags.Usage()
+
 		return
 	}
 
@@ -49,38 +54,50 @@ func main() {
 	waitCh := make(chan interface{})
 	wg := sync.WaitGroup{}
 	var count int64 = 0
+
 	go func() {
-		for i := 0; i < WORKERS; i++ {
+		for i := 0; i < Workers; i++ {
 			wg.Add(1)
+
 			go worker(&count, &wg, db, &mx)
 		}
 		wg.Wait()
 		close(waitCh)
 	}()
 
+L:
 	for {
 		select {
-		case <-time.After(time.Second * 10):
+		case <-time.After(Timer):
 			fmt.Println("Added: ", count)
 		case <-waitCh:
-			break
+			fmt.Println("Added: ", count)
+
+			break L
 		}
 	}
 }
 
 func worker(count *int64, wg *sync.WaitGroup, db *sql.DB, mx *sync.Mutex) {
 	defer wg.Done()
-	for i := 0; i < RECORD_PER_WORKER; i++ {
+
+	for i := 0; i < RecordPerWorker; i++ {
 		p := &domain.Profile{}
+
 		mx.Lock()
+
 		if err := faker.FakeData(p); err != nil {
 			log.Println(err)
 		}
+
 		mx.Unlock()
+
 		if err := AddRecordToDB(db, p); err != nil {
 			log.Println(err)
+
 			continue
 		}
+
 		atomic.AddInt64(count, 1)
 	}
 }
@@ -108,11 +125,13 @@ func AddRecordToDB(db *sql.DB, profile *domain.Profile) error {
 		// 		return errors.Wrap(driverErr, "email exists")
 		// 	}
 		// }
-		log.Println(err)
-		return err
+
+		return errors.Wrap(err, "error during adding new record")
 	}
+
 	if _, err := result.RowsAffected(); err != nil {
-		return err
+		return errors.Wrap(err, "error during getting affected rows")
 	}
+
 	return nil
 }
