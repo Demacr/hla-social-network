@@ -1,0 +1,55 @@
+version: "3"
+
+services:
+  node1:
+    image: perconalab/percona-xtradb-cluster:5.7
+    name: node1
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      CLUSTER_NAME: hla
+    networks:
+      - hla-net
+    ports:
+      - "3306"
+    volumes:
+      # create volumes for use
+      - /var/lib/mysql
+      # bind mount my local my.cnf
+      # - $PWD/my.cnf:/etc/my.cnf
+
+  node2:
+    image: perconalab/percona-xtradb-cluster:5.7
+    name: node2
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      CLUSTER_NAME: hla
+      CLUSTER_JOIN: node1
+    networks:
+      - hla-net
+    ports:
+      - "3306"
+    volumes:
+      # create volumes for use
+      - /var/lib/mysql
+    depends_on:
+      - node1
+
+  node3:
+    image: perconalab/percona-xtradb-cluster:5.7
+    name: node3
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      CLUSTER_NAME: hla
+      CLUSTER_JOIN: node1
+    networks:
+      - hla-net
+    ports:
+      - "3306"
+    volumes:
+      # create volumes for use
+      - /var/lib/mysql
+    depends_on:
+      - node1
+
+networks:
+  hla-net:
