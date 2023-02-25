@@ -14,18 +14,12 @@ services:
       nofile:
         soft: 65536
         hard: 65536
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 4G
-        reservations:
-          cpus: '0.25'
-          memory: 100M
+    cpus: 4
+    mem_limit: 4g
 
 
   mariadb:
-    image: mariadb:10.5.9
+    image: mariadb:10.11.2
     container_name: mariadb
     env_file: ../.env.docker
     restart: always
@@ -33,14 +27,24 @@ services:
       - sn-net
     volumes:
       - social-network-db:/var/lib/mysql
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 4G
-        reservations:
-          cpus: '0.25'
-          memory: 100M
+      - ./mariadb-confs/master/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mariadb-confs/master/initdb.d:/docker-entrypoint-initdb.d
+    cpus: 4
+    mem_limit: 4g
+
+  mariadb-slave:
+    image: mariadb:10.11.2
+    container_name: mariadb-slave
+    env_file: ../.env.docker
+    restart: always
+    networks:
+      - sn-net
+    volumes:
+      - social-network-db-slave:/var/lib/mysql
+      - ./mariadb-confs/slave/my.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mariadb-confs/slave/initdb.d:/docker-entrypoint-initdb.d
+    cpus: 4
+    mem_limit: 4g
 
 networks:
   sn-ext:
@@ -49,3 +53,4 @@ networks:
 
 volumes:
   social-network-db:
+  social-network-db-slave:

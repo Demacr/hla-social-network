@@ -4,40 +4,41 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
+	"sync/atomic"
 	"time"
-
-	"github.com/pkg/errors"
 
 	"github.com/Demacr/otus-hl-socialnetwork/internal/config"
 	"github.com/Demacr/otus-hl-socialnetwork/internal/domain"
 	"github.com/VividCortex/mysqlerr"
 	"github.com/go-sql-driver/mysql"
+	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var (
+const (
 	MAX_OPEN_CONNECTIONS int           = 150
 	MAX_IDLE_CONNECTIONS int           = 150
 	CONNECTION_IDLE_TIME time.Duration = time.Minute * 5
 )
 
-// DB struct contains sql.DB pointer of MySQL database
-//
+// DB struct contains sql.DB pointer of MySQL database.
 type mysqlSocialNetworkRepository struct {
-	Conn *sql.DB
+	Conn   *sql.DB
+	slaves []*sql.DB
+	count  uint64
 }
 
-// NewDB creates new DB struct
-//
+// NewDB creates new DB struct.
 func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepository {
-	dsn := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true",
+	DSNMaster := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true",
 		cfg.Login,
 		cfg.Password,
 		cfg.Host,
 		cfg.Database,
 	)
 
-	db, err := sql.Open("mysql", dsn)
+	db, err := sql.Open("mysql", DSNMaster)
 	if err != nil {
 		panic(err)
 	}
@@ -50,11 +51,43 @@ func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepos
 	db.SetMaxIdleConns(MAX_IDLE_CONNECTIONS)
 	db.SetConnMaxIdleTime(CONNECTION_IDLE_TIME)
 
-	return &mysqlSocialNetworkRepository{Conn: db}
+	dbSlave := db
+	slaves := []*sql.DB{}
+	if cfg.SlaveHosts != "" {
+		slaveHosts := strings.Split(cfg.SlaveHosts, ";")
+		for _, slaveHost := range slaveHosts {
+			DSNSlave := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true",
+				cfg.Login,
+				cfg.Password,
+				slaveHost,
+				cfg.Database,
+			)
+
+			dbSlave, err = sql.Open("mysql", DSNSlave)
+			if err != nil {
+				panic(err)
+			}
+			if err = dbSlave.Ping(); err != nil {
+				panic(err)
+			}
+
+			// Configure pool
+			dbSlave.SetMaxOpenConns(MAX_OPEN_CONNECTIONS)
+			dbSlave.SetMaxIdleConns(MAX_IDLE_CONNECTIONS)
+			dbSlave.SetConnMaxIdleTime(CONNECTION_IDLE_TIME)
+
+			slaves = append(slaves, dbSlave)
+		}
+	}
+
+	return &mysqlSocialNetworkRepository{Conn: db, slaves: slaves}
 }
 
-// WriteProfile writes to DB registration profile
-//
+func (m *mysqlSocialNetworkRepository) Slave() *sql.DB {
+	return m.slaves[atomic.AddUint64(&m.count, 1)%uint64(len(m.slaves))]
+}
+
+// WriteProfile writes to DB registration profile.
 func (m *mysqlSocialNetworkRepository) WriteProfile(profile *domain.Profile) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.MinCost)
 	if err != nil {
@@ -89,7 +122,7 @@ func (m *mysqlSocialNetworkRepository) WriteProfile(profile *domain.Profile) err
 
 func (m *mysqlSocialNetworkRepository) GetProfileByEmail(email string) (*domain.Profile, error) {
 	var profile domain.Profile
-	err := m.Conn.QueryRow("SELECT id, name, surname, age, sex, city, interests FROM users WHERE email = ?", email).Scan(
+	err := m.Slave().QueryRow("SELECT id, name, surname, age, sex, city, interests FROM users WHERE email = ?", email).Scan(
 		&profile.ID,
 		&profile.Name,
 		&profile.Surname,
@@ -107,7 +140,7 @@ func (m *mysqlSocialNetworkRepository) GetProfileByEmail(email string) (*domain.
 
 func (m *mysqlSocialNetworkRepository) GetRelatedProfileById(id, related_id int) (*domain.RelatedProfile, error) {
 	var profile domain.RelatedProfile
-	err := m.Conn.QueryRow("SELECT id, name, surname, age, sex, city, interests, IFNULL((SELECT true from friendship where id1=? and id2=?), false), IFNULL((SELECT true from friendship_requests where id_from=? and id_to=?), false) FROM users WHERE id = ?", related_id, id, related_id, id, id).Scan(
+	err := m.Slave().QueryRow("SELECT id, name, surname, age, sex, city, interests, IFNULL((SELECT true from friendship where id1=? and id2=?), false), IFNULL((SELECT true from friendship_requests where id_from=? and id_to=?), false) FROM users WHERE id = ?", related_id, id, related_id, id, id).Scan(
 		&profile.ID,
 		&profile.Name,
 		&profile.Surname,
@@ -167,10 +200,11 @@ func (m *mysqlSocialNetworkRepository) GetRandomProfiles(exclude_id int) ([]doma
 	result := make([]domain.Profile, 0, 10)
 
 	// SELECT * from (SELECT id, name, surname, age, sex, city, interests FROM users ORDER BY rand() LIMIT 10) u left join friendship on u.id = friendship.id1 left join (select * from friendship_requests where id_from = 3) fr on u.id=fr.id_to;
-	profiles, err := m.Conn.Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE id != ? ORDER BY rand() LIMIT 10", exclude_id)
+	profiles, err := m.Slave().Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE id != ? ORDER BY rand() LIMIT 10", exclude_id)
 	if err != nil {
 		return nil, errors.Wrap(err, "error during select random profiles")
 	}
+	defer profiles.Close()
 
 	for profiles.Next() {
 		profile := domain.Profile{}
@@ -195,7 +229,7 @@ func (m *mysqlSocialNetworkRepository) GetRandomProfiles(exclude_id int) ([]doma
 func (m *mysqlSocialNetworkRepository) GetProfilesBySearchPrefixes(first_name string, last_name string) ([]domain.Profile, error) {
 	result := []domain.Profile{}
 
-	profiles, err := m.Conn.Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE name LIKE ? AND surname LIKE ? ORDER BY id ASC",
+	profiles, err := m.Slave().Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE name LIKE ? AND surname LIKE ? ORDER BY id ASC",
 		first_name+"%",
 		last_name+"%",
 	)
@@ -231,6 +265,7 @@ func (m *mysqlSocialNetworkRepository) GetFriendRequests(id int) ([]domain.Frien
 	if err != nil {
 		return nil, errors.Wrap(err, "error during select friend requests")
 	}
+	defer fr.Close()
 
 	for fr.Next() {
 		req := domain.FriendRequest{}
