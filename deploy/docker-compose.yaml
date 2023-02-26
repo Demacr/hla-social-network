@@ -14,8 +14,8 @@ services:
       nofile:
         soft: 65536
         hard: 65536
-    cpus: 4
-    mem_limit: 4g
+    cpus: 2
+    mem_limit: 2g
 
 
   mariadb:
@@ -29,8 +29,8 @@ services:
       - social-network-db:/var/lib/mysql
       - ./mariadb-confs/master/my.cnf:/etc/mysql/conf.d/my.cnf
       - ./mariadb-confs/master/initdb.d:/docker-entrypoint-initdb.d
-    cpus: 4
-    mem_limit: 4g
+    cpus: 2
+    mem_limit: 2g
 
   mariadb-slave:
     image: mariadb:10.11.2
@@ -43,8 +43,8 @@ services:
       - social-network-db-slave:/var/lib/mysql
       - ./mariadb-confs/slave/my.cnf:/etc/mysql/conf.d/my.cnf
       - ./mariadb-confs/slave/initdb.d:/docker-entrypoint-initdb.d
-    cpus: 4
-    mem_limit: 4g
+    cpus: 2
+    mem_limit: 2g
 
 networks:
   sn-ext:
