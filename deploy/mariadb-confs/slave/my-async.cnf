@@ -1,0 +1,11 @@
+[mysqld]
+server-id = 2
+relay-log = relay-bin
+relay-log-info-file = relay-log.info
+relay-log-index = relay-log.index
+replicate-do-db = otus-social-network
+
+gtid-domain-id = 1
+
+[mariadb]
+rpl_semi_sync_slave_enabled=ON

@@ -1,0 +1,74 @@
+version: "3"
+services:
+  social-network:
+    image: social-network:latest
+    container_name: sn
+    ports:
+      - "8080:8080"
+    env_file: ../.env.docker
+    restart: always
+    networks:
+      - sn-ext
+      - sn-net
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    cpus: 2
+    mem_limit: 2g
+
+
+  mariadb:
+    image: mariadb:10.11.2
+    container_name: mariadb
+    env_file: ../.env.docker
+    restart: always
+    networks:
+      - sn-net
+      - sn-ext
+    ports:
+      - "3306:3306"
+    volumes:
+      - social-network-db-async-master:/var/lib/mysql
+      - ./mariadb-confs/master/my-async.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mariadb-confs/master/initdb.d:/docker-entrypoint-initdb.d
+    cpus: 2
+    mem_limit: 2g
+
+  mariadb-slave-1:
+    image: mariadb:10.11.2
+    container_name: mariadb-slave-1
+    env_file: ../.env.docker
+    restart: always
+    networks:
+      - sn-net
+    volumes:
+      - social-network-db-slave-1:/var/lib/mysql
+      - ./mariadb-confs/slave/my-async.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mariadb-confs/slave/initdb.d:/docker-entrypoint-initdb.d
+    cpus: 2
+    mem_limit: 2g
+
+  mariadb-slave-2:
+    image: mariadb:10.11.2
+    container_name: mariadb-slave-2
+    env_file: ../.env.docker
+    restart: always
+    networks:
+      - sn-net
+    volumes:
+      - social-network-db-slave-2:/var/lib/mysql
+      - ./mariadb-confs/slave/my-async.cnf:/etc/mysql/conf.d/my.cnf
+      - ./mariadb-confs/slave/initdb.d:/docker-entrypoint-initdb.d
+    cpus: 2
+    mem_limit: 2g
+
+networks:
+  sn-ext:
+  sn-net:
+    internal: true
+
+volumes:
+  social-network-db-async-master:
+  social-network-db-slave-1:
+  social-network-db-slave-2:

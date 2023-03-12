@@ -1,0 +1,19 @@
+[mysqld]
+server-id = 1
+log-bin = mysql-bin
+log-bin-index = mysql-bin.index
+log-error = mysql-bin.err
+relay-log = relay-bin
+relay-log-info-file = relay-bin.info
+relay-log-index = relay-bin.index
+expire_logs_days=7
+binlog-do-db = 'otus-social-network'
+
+
+gtid-domain-id = 1
+replicate-do-db = 'otus-social-network'
+sync_binlog = 0
+
+[mariadb]
+rpl_semi_sync_master_enabled=ON
+binlog_format=ROW

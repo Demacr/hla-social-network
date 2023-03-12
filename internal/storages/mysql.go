@@ -84,7 +84,10 @@ func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepos
 }
 
 func (m *mysqlSocialNetworkRepository) Slave() *sql.DB {
-	return m.slaves[atomic.AddUint64(&m.count, 1)%uint64(len(m.slaves))]
+	if len(m.slaves) != 0 {
+		return m.slaves[atomic.AddUint64(&m.count, 1)%uint64(len(m.slaves))]
+	}
+	return m.Conn
 }
 
 // WriteProfile writes to DB registration profile.
