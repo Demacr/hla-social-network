@@ -29,9 +29,11 @@ func main() {
 	}))
 
 	snRepo := storages.NewMysqlSocialNetworkRepository(&config.MySQL)
-	snuc := usecase.NewSocialNetworkUsecase(snRepo)
+	cacheRepo := storages.NewRedisCache(&config.Redis)
+	feeduc := usecase.NewFeederUsecase(snRepo, cacheRepo)
+	snuc := usecase.NewSocialNetworkUsecase(snRepo, cacheRepo, feeduc)
 
-	controller.NewSocialNetworkHandler(e, snuc, config.JWTSecret)
+	controller.NewSocialNetworkHandler(e, snuc, feeduc, config.JWTSecret)
 
 	e.Logger.Fatal(e.Start(fmt.Sprintf(":%d", config.Port)))
 }

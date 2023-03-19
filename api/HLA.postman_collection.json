@@ -9,6 +9,146 @@
 			"name": "Account (auth required)",
 			"item": [
 				{
+					"name": "Posts",
+					"item": [
+						{
+							"name": "GetPost",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{Host}}:{{Port}}/api/account/post/:id",
+									"host": [
+										"{{Host}}"
+									],
+									"port": "{{Port}}",
+									"path": [
+										"api",
+										"account",
+										"post",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{postId}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "CreatePost",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"title\": \"{{title}}\",\n    \"text\": \"{{text}}\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{Host}}:{{Port}}/api/account/post",
+									"host": [
+										"{{Host}}"
+									],
+									"port": "{{Port}}",
+									"path": [
+										"api",
+										"account",
+										"post"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "UpdatePost",
+							"request": {
+								"method": "PUT",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"id\": {{postId}},\n    \"title\": \"New title\",\n    \"text\": \"updated amazing blogpost text\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{Host}}:{{Port}}/api/account/post",
+									"host": [
+										"{{Host}}"
+									],
+									"port": "{{Port}}",
+									"path": [
+										"api",
+										"account",
+										"post"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "DeletePost",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"id\": {{postId}}\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{Host}}:{{Port}}/api/account/post",
+									"host": [
+										"{{Host}}"
+									],
+									"port": "{{Port}}",
+									"path": [
+										"api",
+										"account",
+										"post"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "GetFeed",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{Host}}:{{Port}}/api/account/post/feed",
+									"host": [
+										"{{Host}}"
+									],
+									"port": "{{Port}}",
+									"path": [
+										"api",
+										"account",
+										"post",
+										"feed"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
 					"name": "My Info",
 					"request": {
 						"method": "GET",
@@ -219,6 +359,66 @@
 					{
 						"key": "token",
 						"value": "{{TOKEN}}",
+						"type": "string"
+					}
+				]
+			},
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "RebuildFeeds",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{Host}}:{{Port}}/api/admin/rebuild_feeds",
+							"host": [
+								"{{Host}}"
+							],
+							"port": "{{Port}}",
+							"path": [
+								"api",
+								"admin",
+								"rebuild_feeds"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"auth": {
+				"type": "basic",
+				"basic": [
+					{
+						"key": "password",
+						"value": "{{adminPassword}}",
+						"type": "string"
+					},
+					{
+						"key": "username",
+						"value": "{{adminUsername}}",
 						"type": "string"
 					}
 				]

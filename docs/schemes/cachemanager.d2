@@ -1,0 +1,19 @@
+User: {shape: Person}
+
+Infra: {
+  Service: {
+    _._.User -> Controller: NewPost
+    Usecase: {
+      SocialNetwork -> Feeder: Channeled notification about new post
+      _.Controller -> SocialNetwork: NewPost
+      Feeder -> _.CacheRepository: Add and Trim feed for user's friends
+      Feeder -> _.DatabaseRepository: Get user's friends
+    }
+    Usecase.SocialNetwork -> DatabaseRepository: NewPost
+    Usecase.SocialNetwork -> CacheRepository: NewPost
+    DatabaseRepository -> _.Database: NewPost
+    CacheRepository -> _.Cache: NewPost
+    CacheRepository -> _.Cache: Add and Trim feed for user's friends
+    DatabaseRepository -> _.Database: Get user's friends
+  }
+}

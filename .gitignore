@@ -1,3 +1,6 @@
+db-lt-generator
+social-network
+
 .env*
 !*.example
 
