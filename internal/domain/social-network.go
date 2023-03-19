@@ -36,6 +36,13 @@ type FriendRequest struct {
 	FriendID int `json:"friendID"`
 }
 
+type Post struct {
+	Id        int    `json:"id"`
+	ProfileId int    `json:"profile_id"`
+	Title     string `json:"title"`
+	Text      string `json:"text"`
+}
+
 type SocialNetworkUsecase interface {
 	Registrate(*Profile) error
 	Authorize(*Credentials) (*Profile, error)
@@ -47,4 +54,9 @@ type SocialNetworkUsecase interface {
 	FriendshipRequestDecline(int, int) error
 	GetFriendshipRequests(int) ([]FriendRequest, error)
 	GetRelatedProfile(int, int) (*RelatedProfile, error)
+	// Posts
+	CreatePost(int, *Post) error
+	UpdatePost(int, *Post) error
+	DeletePost(int, *Post) error
+	GetPost(int) (*Post, error)
 }

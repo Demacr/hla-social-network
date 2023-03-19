@@ -7,12 +7,17 @@ import (
 )
 
 type socialNetworkUsecase struct {
-	repo storages.SocialNetworkRepository
+	repo        storages.SocialNetworkRepository
+	cache       storages.CacheRepository
+	feedChan    chan<- *domain.Post
+	rebuildChan chan<- int
 }
 
-func NewSocialNetworkUsecase(snRepo storages.SocialNetworkRepository) domain.SocialNetworkUsecase {
+func NewSocialNetworkUsecase(snRepo storages.SocialNetworkRepository, cacheRepo storages.CacheRepository, feeder domain.FeederUsecase) domain.SocialNetworkUsecase {
 	return &socialNetworkUsecase{
-		repo: snRepo,
+		repo:     snRepo,
+		cache:    cacheRepo,
+		feedChan: feeder.GetFeedUpdateChannel(),
 	}
 }
 
@@ -91,6 +96,8 @@ func (sn *socialNetworkUsecase) FriendshipRequestAccept(id1, id2 int) error {
 		return domain.ErrFriendshipRequestNotExists
 	}
 
+	sn.rebuildChan <- id1
+
 	return nil
 }
 
@@ -124,4 +131,78 @@ func (sn *socialNetworkUsecase) GetRelatedProfile(id, related_id int) (*domain.R
 	}
 
 	return result, nil
+}
+
+func (sn *socialNetworkUsecase) CreatePost(profileId int, post *domain.Post) error {
+	post.ProfileId = profileId
+
+	//TODO: add validation for empty posts
+	id, err := sn.repo.CreatePost(profileId, post)
+	if err != nil {
+		err = errors.Wrap(err, "creating post")
+		return err
+	}
+
+	post.Id = id
+
+	err = sn.cache.SetPost(post)
+	if err != nil {
+		return errors.Wrap(err, "Usecase.CreatePost.Cache.SetPost")
+	}
+
+	sn.feedChan <- post
+
+	return nil
+}
+func (sn *socialNetworkUsecase) UpdatePost(profileId int, post *domain.Post) error {
+	post.ProfileId = profileId
+
+	err := sn.repo.UpdatePost(profileId, post)
+	if err != nil {
+		err = errors.Wrap(err, "updating post")
+		return err
+	}
+
+	err = sn.cache.SetPost(post)
+	if err != nil {
+		return errors.Wrap(err, "Usecase.UpdatePost.Cache.SetPost")
+	}
+
+	return nil
+}
+func (sn *socialNetworkUsecase) DeletePost(profileId int, post *domain.Post) error {
+	err := sn.repo.DeletePost(profileId, post)
+	if err != nil {
+		err = errors.Wrap(err, "deleting post")
+		return err
+	}
+
+	err = sn.cache.DeletePost(post.Id)
+	if err != nil {
+		return errors.Wrap(err, "Usecase.DeletePost.Cache.DeletePost")
+	}
+
+	return nil
+}
+func (sn *socialNetworkUsecase) GetPost(postId int) (*domain.Post, error) {
+	post, err := sn.cache.GetPost(postId)
+	if err != nil {
+		return nil, errors.Wrap(err, "Usecase.GetPost.Cache.GetPost")
+	}
+
+	if *post != (domain.Post{}) {
+		return post, nil
+	}
+
+	post, err = sn.repo.GetPost(postId)
+	if err != nil {
+		return nil, errors.Wrap(err, "getting post")
+	}
+
+	err = sn.cache.SetPost(post)
+	if err != nil {
+		return nil, errors.Wrap(err, "Usecase.GetPost.Cache.SetPost")
+	}
+
+	return post, nil
 }

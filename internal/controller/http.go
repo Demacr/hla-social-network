@@ -18,21 +18,22 @@ type ResponseError struct {
 }
 
 type SocialNetworkHandler struct {
-	SNUsecase domain.SocialNetworkUsecase
-	JWTSecret string
+	SNUsecase     domain.SocialNetworkUsecase
+	FeederUsecase domain.FeederUsecase
+	JWTSecret     string
 }
 
-func NewSocialNetworkHandler(e *echo.Echo, snuc domain.SocialNetworkUsecase, JWTSecret string) {
+func NewSocialNetworkHandler(e *echo.Echo, snuc domain.SocialNetworkUsecase, feeduc domain.FeederUsecase, JWTSecret string) {
 	handler := &SocialNetworkHandler{
-		SNUsecase: snuc,
-		JWTSecret: JWTSecret,
+		SNUsecase:     snuc,
+		FeederUsecase: feeduc,
+		JWTSecret:     JWTSecret,
 	}
 
 	e.POST("/api/registrate", handler.Registrate)
 	e.POST("/api/authorize", handler.Authorize)
 
-	r := e.Group("/api/account")
-	r.Use(middleware.JWT([]byte(handler.JWTSecret)))
+	r := e.Group("/api/account", middleware.JWT([]byte(handler.JWTSecret)))
 	r.GET("/myinfo", handler.GetMyInfo)
 	r.GET("/getpeople", handler.GetPeople)
 	r.POST("/friend_request", handler.FriendRequest)
@@ -41,6 +42,19 @@ func NewSocialNetworkHandler(e *echo.Echo, snuc domain.SocialNetworkUsecase, JWT
 	r.GET("/my_friend_requests", handler.GetFriendshipRequests)
 	r.GET("/profile/:id", handler.GetRelatedProfile)
 	r.GET("/search", handler.GetProfilesBySearchPrefixes)
+
+	r.POST("/post", handler.CreatePost)
+	r.PUT("/post", handler.UpdatePost)
+	r.DELETE("/post", handler.DeletePost)
+	r.GET("/post/:id", handler.GetPost)
+	r.GET("/post/feed", handler.GetFeed)
+
+	admin := e.Group("/api/admin", middleware.BasicAuthWithConfig(middleware.BasicAuthConfig{
+		Validator: func(s1, s2 string, ctx echo.Context) (bool, error) {
+			return s1 == "admin" && s2 == "adminpassword", nil
+		},
+	}))
+	admin.GET("/rebuild_feeds", handler.RebuildFeeds)
 }
 
 func (h *SocialNetworkHandler) Registrate(c echo.Context) error {
@@ -222,6 +236,101 @@ func (h *SocialNetworkHandler) GetProfilesBySearchPrefixes(c echo.Context) error
 	}
 
 	return c.JSON(http.StatusOK, result)
+}
+
+func (h *SocialNetworkHandler) CreatePost(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+
+	post := &domain.Post{}
+	if err := c.Bind(post); err != nil {
+		log.Println(err)
+		return c.String(http.StatusBadRequest, "Bad json.")
+	}
+
+	err := h.SNUsecase.CreatePost(int(id), post)
+	if err != nil {
+		log.Println(err)
+		return c.String(http.StatusInternalServerError, "")
+	}
+
+	return c.NoContent(http.StatusCreated)
+}
+
+func (h *SocialNetworkHandler) UpdatePost(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+
+	post := &domain.Post{}
+	if err := c.Bind(post); err != nil {
+		log.Println(err)
+		return c.String(http.StatusBadRequest, "Bad json.")
+	}
+
+	err := h.SNUsecase.UpdatePost(int(id), post)
+	if err != nil {
+		log.Println(err)
+		return c.String(http.StatusInternalServerError, "")
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func (h *SocialNetworkHandler) DeletePost(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+
+	post := &domain.Post{}
+	if err := c.Bind(post); err != nil {
+		log.Println(err)
+		return c.String(http.StatusBadRequest, "Bad json.")
+	}
+
+	err := h.SNUsecase.DeletePost(int(id), post)
+	if err != nil {
+		log.Println(err)
+		return c.String(http.StatusInternalServerError, "")
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func (h *SocialNetworkHandler) GetPost(c echo.Context) error {
+	post_id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		return c.String(http.StatusBadRequest, "Bad profile id")
+	}
+
+	post, err := h.SNUsecase.GetPost(post_id)
+	if err != nil {
+		log.Println(err)
+		return c.String(http.StatusInternalServerError, "")
+	}
+
+	return c.JSON(http.StatusOK, post)
+}
+
+func (h *SocialNetworkHandler) GetFeed(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+
+	feed, err := h.FeederUsecase.GetFeedIds(int(id))
+	if err != nil {
+		log.Println(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	return c.JSON(http.StatusOK, feed)
+}
+
+func (h *SocialNetworkHandler) RebuildFeeds(c echo.Context) error {
+	err := h.FeederUsecase.RebuildFeeds()
+	if err != nil {
+		log.Println(err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	return c.NoContent(http.StatusOK)
 }
 
 func getStatusCode(err error) int {

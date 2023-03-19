@@ -2,6 +2,9 @@ version: "3"
 services:
   social-network:
     image: social-network:latest
+    build:
+      context: ../
+      dockerfile: build/Dockerfile
     container_name: sn
     ports:
       - "8080:8080"
@@ -16,7 +19,10 @@ services:
         hard: 65536
     cpus: 2
     mem_limit: 2g
-
+    depends_on:
+      - mariadb
+      - mariadb-slave
+      - redis
 
   mariadb:
     image: mariadb:10.11.2
@@ -45,6 +51,19 @@ services:
       - ./mariadb-confs/slave/initdb.d:/docker-entrypoint-initdb.d
     cpus: 2
     mem_limit: 2g
+    depends_on:
+      - mariadb
+
+  redis:
+    image: redis
+    container_name: redis
+    restart: always
+    networks:
+      - sn-net
+    cpus: 1
+    mem_limit: 1g
+    depends_on:
+    - mariadb
 
 networks:
   sn-ext:
