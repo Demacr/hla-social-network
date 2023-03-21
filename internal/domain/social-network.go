@@ -13,7 +13,7 @@ type Profile struct {
 	Interests string `json:"interests,omitempty" faker:"paragraph"`
 	City      string `json:"city,omitempty"      faker:"word"`
 	Email     string `json:"email,omitempty"     faker:"email"`
-	Password  string `json:"password,omitempty"  faker:"password"`
+	Password  string `json:"password,omitempty"  faker:"oneof: 12345"`
 }
 
 type RelatedProfile struct {
@@ -37,10 +37,10 @@ type FriendRequest struct {
 }
 
 type Post struct {
-	Id        int    `json:"id"`
-	ProfileId int    `json:"profile_id"`
-	Title     string `json:"title"`
-	Text      string `json:"text"`
+	Id        int    `json:"id"         faker:"-"`
+	ProfileId int    `json:"profile_id" faker:"-"`
+	Title     string `json:"title"      faker:"sentence"`
+	Text      string `json:"text"       faker:"paragraph"`
 }
 
 type SocialNetworkUsecase interface {

@@ -31,6 +31,9 @@ services:
     restart: always
     networks:
       - sn-net
+      - sn-ext
+    ports:
+      - "3306:3306"
     volumes:
       - social-network-db:/var/lib/mysql
       - ./mariadb-confs/master/my.cnf:/etc/mysql/conf.d/my.cnf
