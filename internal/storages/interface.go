@@ -15,7 +15,6 @@ type SocialNetworkRepository interface {
 	WriteProfile(profile *domain.Profile) error
 	GetProfileByEmail(email string) (*domain.Profile, error)
 	GetRelatedProfileById(id, related_id int) (*domain.RelatedProfile, error)
-	CheckCredentials(credentials *domain.Credentials) (bool, error)
 	GetLastProfileId() (int, error)
 	// Friendship section.
 	CreateFriendRequest(id, friend_id int) (bool, error)
@@ -31,6 +30,9 @@ type SocialNetworkRepository interface {
 	DeletePost(profile_id int, post *domain.Post) error
 	GetPost(post_id int) (*domain.Post, error)
 	GetFeedLastN(int, int) ([]int, error)
+	// Dialogs section.
+	CreateMessage(*domain.Message) error
+	GetDialog(id1 int, id2 int) ([]*domain.Message, error)
 }
 
 type FeedManager interface {

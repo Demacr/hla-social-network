@@ -34,6 +34,7 @@ func NewSocialNetworkHandler(e *echo.Echo, snuc domain.SocialNetworkUsecase, fee
 	e.POST("/api/authorize", handler.Authorize)
 
 	r := e.Group("/api/account", middleware.JWT([]byte(handler.JWTSecret)))
+	d := e.Group("/api/dialog", middleware.JWT([]byte(handler.JWTSecret)))
 	r.GET("/myinfo", handler.GetMyInfo)
 	r.GET("/getpeople", handler.GetPeople)
 	r.POST("/friend_request", handler.FriendRequest)
@@ -48,6 +49,9 @@ func NewSocialNetworkHandler(e *echo.Echo, snuc domain.SocialNetworkUsecase, fee
 	r.DELETE("/post", handler.DeletePost)
 	r.GET("/post/:id", handler.GetPost)
 	r.GET("/post/feed", handler.GetFeed)
+
+	d.POST("/:id/send", handler.SendMessage)
+	d.GET("/:id/list", handler.GetDialog)
 
 	admin := e.Group("/api/admin", middleware.BasicAuthWithConfig(middleware.BasicAuthConfig{
 		Validator: func(s1, s2 string, ctx echo.Context) (bool, error) {
@@ -99,6 +103,7 @@ func (h *SocialNetworkHandler) Authorize(c echo.Context) error {
 }
 
 func (h *SocialNetworkHandler) GetMyInfo(c echo.Context) error {
+	// TODO: rework this flow to use id from JWT.
 	user := c.Get("user").(*jwt.Token)
 	email := user.Claims.(jwt.MapClaims)["email"].(string)
 
@@ -112,10 +117,9 @@ func (h *SocialNetworkHandler) GetMyInfo(c echo.Context) error {
 }
 
 func (h *SocialNetworkHandler) GetPeople(c echo.Context) error {
-	user_token := c.Get("user").(*jwt.Token)
-	user_id := user_token.Claims.(jwt.MapClaims)["id"].(float64)
+	user_id := getUserId(c)
 
-	result, err := h.SNUsecase.GetRandomProfiles(int(user_id))
+	result, err := h.SNUsecase.GetRandomProfiles(user_id)
 	if err != nil {
 		return c.String(http.StatusInternalServerError, "Internal error")
 	}
@@ -130,8 +134,7 @@ func (h *SocialNetworkHandler) FriendRequest(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "Bad json.")
 	}
 
-	user := c.Get("user").(*jwt.Token)
-	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+	id := getUserId(c)
 
 	err := h.SNUsecase.CreateFriendRequest(int(id), friend_request.FriendID)
 	if err != nil {
@@ -149,8 +152,7 @@ func (h *SocialNetworkHandler) FriendshipRequestAccept(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "Bad json.")
 	}
 
-	user := c.Get("user").(*jwt.Token)
-	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+	id := getUserId(c)
 
 	err := h.SNUsecase.FriendshipRequestAccept(int(id), friend_request.FriendID)
 	if err != nil {
@@ -168,8 +170,7 @@ func (h *SocialNetworkHandler) FriendshipRequestDecline(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "Bad json.")
 	}
 
-	user := c.Get("user").(*jwt.Token)
-	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+	id := getUserId(c)
 
 	err := h.SNUsecase.FriendshipRequestDecline(int(id), friend_request.FriendID)
 	if err != nil {
@@ -181,8 +182,7 @@ func (h *SocialNetworkHandler) FriendshipRequestDecline(c echo.Context) error {
 }
 
 func (h *SocialNetworkHandler) GetFriendshipRequests(c echo.Context) error {
-	user := c.Get("user").(*jwt.Token)
-	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+	id := getUserId(c)
 
 	friend_requests, err := h.SNUsecase.GetFriendshipRequests(int(id))
 	if err != nil {
@@ -239,8 +239,7 @@ func (h *SocialNetworkHandler) GetProfilesBySearchPrefixes(c echo.Context) error
 }
 
 func (h *SocialNetworkHandler) CreatePost(c echo.Context) error {
-	user := c.Get("user").(*jwt.Token)
-	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+	id := getUserId(c)
 
 	post := &domain.Post{}
 	if err := c.Bind(post); err != nil {
@@ -258,8 +257,7 @@ func (h *SocialNetworkHandler) CreatePost(c echo.Context) error {
 }
 
 func (h *SocialNetworkHandler) UpdatePost(c echo.Context) error {
-	user := c.Get("user").(*jwt.Token)
-	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+	id := getUserId(c)
 
 	post := &domain.Post{}
 	if err := c.Bind(post); err != nil {
@@ -277,8 +275,7 @@ func (h *SocialNetworkHandler) UpdatePost(c echo.Context) error {
 }
 
 func (h *SocialNetworkHandler) DeletePost(c echo.Context) error {
-	user := c.Get("user").(*jwt.Token)
-	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+	id := getUserId(c)
 
 	post := &domain.Post{}
 	if err := c.Bind(post); err != nil {
@@ -311,8 +308,7 @@ func (h *SocialNetworkHandler) GetPost(c echo.Context) error {
 }
 
 func (h *SocialNetworkHandler) GetFeed(c echo.Context) error {
-	user := c.Get("user").(*jwt.Token)
-	id := user.Claims.(jwt.MapClaims)["id"].(float64)
+	id := getUserId(c)
 
 	feed, err := h.FeederUsecase.GetFeedIds(int(id))
 	if err != nil {
@@ -331,6 +327,54 @@ func (h *SocialNetworkHandler) RebuildFeeds(c echo.Context) error {
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+func (h *SocialNetworkHandler) SendMessage(c echo.Context) error {
+	id := getUserId(c)
+
+	friendId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		log.Println(errors.Wrap(err, "Controller.SendMessage.Atoi"))
+		return c.NoContent(http.StatusBadRequest)
+	}
+
+	message := &domain.Message{}
+	if err := c.Bind(message); err != nil {
+		log.Println(errors.Wrap(err, "Controller.SendMessage.Bind"))
+		return c.String(http.StatusBadRequest, "Bad json.")
+	}
+	message.From = int(id)
+	message.To = friendId
+	message.Timestamp = time.Now()
+
+	if err = h.SNUsecase.SendMessage(message); err != nil {
+		log.Println(errors.Wrap(err, "Controller.SendMessage.Usecase.SendMessage"))
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	return nil
+}
+
+func (h *SocialNetworkHandler) GetDialog(c echo.Context) error {
+	id := getUserId(c)
+
+	friendId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		log.Println(errors.Wrap(err, "Controller.GetDialog.Atoi"))
+		return c.NoContent(http.StatusBadRequest)
+	}
+
+	messages, err := h.SNUsecase.GetDialog(int(id), friendId)
+	if err != nil {
+		log.Println(errors.Wrap(err, "Controller.GetDialog.Usecase.GetDialog"))
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	return c.JSON(http.StatusOK, messages)
+}
+
+func getUserId(c echo.Context) int {
+	return int(c.Get("user").(*jwt.Token).Claims.(jwt.MapClaims)["id"].(float64))
 }
 
 func getStatusCode(err error) int {

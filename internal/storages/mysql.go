@@ -31,7 +31,7 @@ type mysqlSocialNetworkRepository struct {
 
 // NewDB creates new DB struct.
 func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepository {
-	DSNMaster := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true",
+	DSNMaster := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true&parseTime=true",
 		cfg.Login,
 		cfg.Password,
 		cfg.Host,
@@ -56,7 +56,7 @@ func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepos
 	if cfg.SlaveHosts != "" {
 		slaveHosts := strings.Split(cfg.SlaveHosts, ";")
 		for _, slaveHost := range slaveHosts {
-			DSNSlave := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true",
+			DSNSlave := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true&parseTime=true",
 				cfg.Login,
 				cfg.Password,
 				slaveHost,
@@ -125,7 +125,7 @@ func (m *mysqlSocialNetworkRepository) WriteProfile(profile *domain.Profile) err
 
 func (m *mysqlSocialNetworkRepository) GetProfileByEmail(email string) (*domain.Profile, error) {
 	var profile domain.Profile
-	err := m.Slave().QueryRow("SELECT id, name, surname, age, sex, city, interests FROM users WHERE email = ?", email).Scan(
+	err := m.Slave().QueryRow("SELECT id, name, surname, age, sex, city, interests, email, password FROM users WHERE email = ?", email).Scan(
 		&profile.ID,
 		&profile.Name,
 		&profile.Surname,
@@ -133,6 +133,8 @@ func (m *mysqlSocialNetworkRepository) GetProfileByEmail(email string) (*domain.
 		&profile.Sex,
 		&profile.City,
 		&profile.Interests,
+		&profile.Email,
+		&profile.Password,
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "GetProfileByEmail")
@@ -159,22 +161,6 @@ func (m *mysqlSocialNetworkRepository) GetRelatedProfileById(id, related_id int)
 	}
 
 	return &profile, nil
-}
-
-// CheckCredentials checks valid credentials or not
-func (m *mysqlSocialNetworkRepository) CheckCredentials(credentials *domain.Credentials) (bool, error) {
-	var hashedPassword string
-	err := m.Conn.QueryRow("SELECT password FROM users WHERE email = ?", credentials.Email).Scan(&hashedPassword)
-	if err != nil {
-		return false, errors.Wrap(err, "CheckCredentials: No user found")
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(credentials.Password))
-	if err != nil {
-		return false, errors.Wrap(err, "CheckCredentials: Login or password mismatched")
-	}
-
-	return true, nil
 }
 
 func (m *mysqlSocialNetworkRepository) GetLastProfileId() (int, error) {
@@ -499,6 +485,93 @@ func (m *mysqlSocialNetworkRepository) GetFeedLastN(profileId int, N int) (resul
 			log.Println(errors.Wrap(err, "MySQLRepository.GetFeedLastN.Scan"))
 		}
 		result = append(result, id)
+	}
+
+	return result, nil
+}
+
+// TODO: move out getting dialog_id and possibly cache it locally
+func (m *mysqlSocialNetworkRepository) CreateMessage(message *domain.Message) error {
+	id1, id2 := message.From, message.To
+	if id2 < id1 {
+		id1, id2 = id2, id1
+	}
+
+	tx, err := m.Conn.Begin()
+	if err != nil {
+		return errors.Wrap(err, "MySQLRepository.CreateMessage.Begin")
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			log.Fatalln(err)
+		}
+	}()
+
+	var dialogId int
+	err = tx.QueryRow("SELECT id FROM dialogs WHERE id1 = ? AND id2 = ?", id1, id2).Scan(&dialogId)
+	if errors.Is(err, sql.ErrNoRows) {
+		res, err := tx.Exec("INSERT INTO dialogs(id1, id2) VALUES(?, ?)", id1, id2)
+		if err != nil {
+			return errors.Wrap(err, "MySQLRepository.CreateMessage.Exec.INSERTINTODialogs")
+		}
+		dialogId64, err := res.LastInsertId()
+		if err != nil {
+			return errors.Wrap(err, "MySQLRepository.CreateMessage.LastInsertId")
+		}
+		dialogId = int(dialogId64)
+	} else if err != nil {
+		return errors.Wrap(err, "MySQLRepository.CreateMessage.QueryRow")
+	}
+
+	result, err := tx.Exec("INSERT INTO messages(dialog_id, id_from, id_to, seq, ts, text) VALUES(?, ?, ?, (SELECT COALESCE(MAX(seq), 0) FROM messages as m WHERE m.dialog_id = ?) + 1, ?, ?);",
+		dialogId,
+		message.From,
+		message.To,
+		dialogId,
+		message.Timestamp,
+		message.Text,
+	)
+	if err != nil {
+		return errors.Wrap(err, "MySQLRepository.CreateMessage.Exec")
+	}
+
+	if rows, err := result.RowsAffected(); err != nil {
+		return errors.Wrap(err, "MySQLRepository.CreateMessage.RowsAffected")
+	} else if rows != 1 {
+		return errors.New("MySQLRepository.CreateMessage.RowsAffected: affected rows doesn't equal to 1")
+	}
+
+	if err = tx.Commit(); err != nil {
+		return errors.Wrap(err, "MySQLRepository.CreateMessage.Commit")
+	}
+
+	return nil
+}
+
+func (m *mysqlSocialNetworkRepository) GetDialog(id1 int, id2 int) ([]*domain.Message, error) {
+	if id1 > id2 {
+		id1, id2 = id2, id1
+	}
+
+	rows, err := m.Conn.Query("SELECT id_from, id_to, ts, text FROM messages WHERE dialog_id = (SELECT id from dialogs WHERE id1 = ? AND id2 = ?) ORDER BY seq DESC", id1, id2)
+	if err != nil {
+		return nil, errors.Wrap(err, "MySQLRepository.GetDialog.Query")
+	}
+
+	result := make([]*domain.Message, 0)
+	for rows.Next() {
+		message := &domain.Message{}
+		err = rows.Scan(
+			&message.From,
+			&message.To,
+			&message.Timestamp,
+			&message.Text,
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "MySQLRepository.GetDialog.Scan")
+		}
+
+		result = append(result, message)
 	}
 
 	return result, nil

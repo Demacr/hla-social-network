@@ -9,4 +9,4 @@ CREATE TABLE `posts` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- +goose Down
-DROP TABLE `friendship`;
+DROP TABLE `posts`;

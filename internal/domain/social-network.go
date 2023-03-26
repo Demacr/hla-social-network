@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"time"
+
 	"github.com/golang-jwt/jwt"
 )
 
@@ -43,6 +45,13 @@ type Post struct {
 	Text      string `json:"text"       faker:"paragraph"`
 }
 
+type Message struct {
+	From      int       //`json:"from"`
+	To        int       //`json:"to"`
+	Timestamp time.Time //`json:"timestamp"`
+	Text      string    `json:"text"`
+}
+
 type SocialNetworkUsecase interface {
 	Registrate(*Profile) error
 	Authorize(*Credentials) (*Profile, error)
@@ -59,4 +68,7 @@ type SocialNetworkUsecase interface {
 	UpdatePost(int, *Post) error
 	DeletePost(int, *Post) error
 	GetPost(int) (*Post, error)
+	// Dialogs
+	SendMessage(*Message) error
+	GetDialog(int, int) ([]*Message, error)
 }

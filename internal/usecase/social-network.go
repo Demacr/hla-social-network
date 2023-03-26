@@ -4,6 +4,7 @@ import (
 	"github.com/Demacr/otus-hl-socialnetwork/internal/domain"
 	"github.com/Demacr/otus-hl-socialnetwork/internal/storages"
 	"github.com/pkg/errors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type socialNetworkUsecase struct {
@@ -35,13 +36,17 @@ func (sn *socialNetworkUsecase) Registrate(profile *domain.Profile) error {
 }
 
 func (sn *socialNetworkUsecase) Authorize(credentials *domain.Credentials) (*domain.Profile, error) {
-	result, err := sn.repo.CheckCredentials(credentials)
+	// result, err := sn.repo.CheckCredentials(credentials)
+	result, err := sn.repo.GetProfileByEmail(credentials.Email)
 	if err != nil {
-		err = errors.Wrap(err, "authorization failed")
-		return nil, err
+		return nil, errors.Wrap(err, "Usecase.Authorize.GetProfileByEmail")
 	}
-	if !result {
+
+	err = bcrypt.CompareHashAndPassword([]byte(result.Password), []byte(credentials.Password))
+	if err != nil && errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 		return nil, domain.ErrWrongCredentials
+	} else if err != nil {
+		return nil, errors.Wrap(err, "Usecase.Authorize.CompareHashAndPassword")
 	}
 
 	return sn.GetProfileInfo(credentials.Email)
@@ -53,6 +58,9 @@ func (sn *socialNetworkUsecase) GetProfileInfo(email string) (*domain.Profile, e
 		err = errors.Wrap(err, "get profile error")
 		return nil, err
 	}
+
+	result.Password = ""
+
 	return result, nil
 }
 
@@ -154,6 +162,7 @@ func (sn *socialNetworkUsecase) CreatePost(profileId int, post *domain.Post) err
 
 	return nil
 }
+
 func (sn *socialNetworkUsecase) UpdatePost(profileId int, post *domain.Post) error {
 	post.ProfileId = profileId
 
@@ -170,6 +179,7 @@ func (sn *socialNetworkUsecase) UpdatePost(profileId int, post *domain.Post) err
 
 	return nil
 }
+
 func (sn *socialNetworkUsecase) DeletePost(profileId int, post *domain.Post) error {
 	err := sn.repo.DeletePost(profileId, post)
 	if err != nil {
@@ -184,6 +194,7 @@ func (sn *socialNetworkUsecase) DeletePost(profileId int, post *domain.Post) err
 
 	return nil
 }
+
 func (sn *socialNetworkUsecase) GetPost(postId int) (*domain.Post, error) {
 	post, err := sn.cache.GetPost(postId)
 	if err != nil {
@@ -205,4 +216,21 @@ func (sn *socialNetworkUsecase) GetPost(postId int) (*domain.Post, error) {
 	}
 
 	return post, nil
+}
+
+func (sn *socialNetworkUsecase) SendMessage(message *domain.Message) error {
+	if err := sn.repo.CreateMessage(message); err != nil {
+		return errors.Wrap(err, "Usecase.SendMessage.CreateMessage")
+	}
+
+	return nil
+}
+
+func (sn *socialNetworkUsecase) GetDialog(from int, to int) ([]*domain.Message, error) {
+	result, err := sn.repo.GetDialog(from, to)
+	if err != nil {
+		return nil, errors.Wrap(err, "Usecase.GetDialog.GetDialog")
+	}
+
+	return result, nil
 }

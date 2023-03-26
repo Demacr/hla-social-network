@@ -149,6 +149,74 @@
 					]
 				},
 				{
+					"name": "Dialogs",
+					"item": [
+						{
+							"name": "SendMessage",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"text\": \"hi, psina\"\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{Host}}:{{Port}}/api/dialog/:id/send",
+									"host": [
+										"{{Host}}"
+									],
+									"port": "{{Port}}",
+									"path": [
+										"api",
+										"dialog",
+										":id",
+										"send"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{friendID}}"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get Dialog",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{Host}}:{{Port}}/api/dialog/:id/list",
+									"host": [
+										"{{Host}}"
+									],
+									"port": "{{Port}}",
+									"path": [
+										"api",
+										"dialog",
+										":id",
+										"list"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "{{friendID}}"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
 					"name": "My Info",
 					"request": {
 						"method": "GET",
