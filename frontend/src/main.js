@@ -17,6 +17,9 @@ import Dialog from 'primevue/dialog';
 import InputNumber from 'primevue/inputnumber';
 import InputText from 'primevue/inputtext';
 import RadioButton from 'primevue/radiobutton';
+import ScrollPanel from 'primevue/scrollpanel';
+
+import MyInfo from './components/MyInfo'
 
 // const token = localStorage.getItem('token');
 
@@ -36,6 +39,8 @@ app.component('DataTable', DataTable);
 // eslint-disable-next-line
 app.component('Dialog', Dialog);
 app.component('RadioButton', RadioButton);
+app.component('ScrollPanel', ScrollPanel);
+app.component('MyInfo', MyInfo);
 app.mount('#app');
 // app.config.globalProperties.$http = Axios;
 // if (token) {

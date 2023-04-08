@@ -33,7 +33,7 @@
             </span>
             <span class="grid field">
                 <label class="col-fixed" style="width:100px" for="age">Age</label>
-                <InputNumber id="age" type="text" v-model="registrateForm.age"/>
+                <InputNumber id="age" type="text" v-model="registrateForm.age" />
             </span>
             <span class="grid field">
                 <label class="col-fixed" style="width:100px" for="sex">Sex</label>
@@ -57,8 +57,8 @@
             </span>
         </div>
         <template #footer>
-            <Button label="Cancel" icon="pi pi-times" class="p-button-text" @click="onClose"/>
-            <Button label="Registrate" icon="pi pi-check" @click="onSubmit"/>
+            <Button label="Cancel" icon="pi pi-times" class="p-button-text" @click="onClose" />
+            <Button label="Registrate" icon="pi pi-check" @click="onSubmit" />
         </template>
     </Dialog>
 </template>
@@ -95,7 +95,7 @@ export default {
             axios.post(path, payload)
                 .then((result) => {
                     localStorage.setItem('token', result.data.token);
-                    this.$router.push('/home');
+                    this.$router.push('/');
                 })
                 .catch(() => {
                 },
@@ -106,8 +106,8 @@ export default {
             axios.post(path, payload)
                 .catch((error) => {
                     // eslint-disable-next-line
-                        console.log(error);
-                    },
+                    console.log(error);
+                },
                 );
         },
         initForm() {
@@ -143,6 +143,4 @@ export default {
 };
 </script>
 
-<style>
-
-</style>
+<style></style>

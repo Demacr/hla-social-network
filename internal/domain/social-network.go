@@ -52,6 +52,12 @@ type Message struct {
 	Text      string    `json:"text"`
 }
 
+type DialogPreview struct {
+	DialogID    int    `json:"dialog_id"`
+	FriendID    int    `json:"friend_id"`
+	LastMessage string `json:"last_message"`
+}
+
 type SocialNetworkUsecase interface {
 	Registrate(*Profile) error
 	Authorize(*Credentials) (*Profile, error)
@@ -71,4 +77,5 @@ type SocialNetworkUsecase interface {
 	// Dialogs
 	SendMessage(*Message) error
 	GetDialog(int, int) ([]*Message, error)
+	GetDialogList(int) ([]*DialogPreview, error)
 }

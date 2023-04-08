@@ -33,6 +33,7 @@ type SocialNetworkRepository interface {
 	// Dialogs section.
 	CreateMessage(*domain.Message) error
 	GetDialog(id1 int, id2 int) ([]*domain.Message, error)
+	GetDialogList(id int) ([]*domain.DialogPreview, error)
 }
 
 type FeedManager interface {

@@ -458,8 +458,9 @@ func (m *mysqlSocialNetworkRepository) DeletePost(profile_id int, post *domain.P
 
 func (m *mysqlSocialNetworkRepository) GetPost(post_id int) (*domain.Post, error) {
 	var post domain.Post
-	err := m.Conn.QueryRow("SELECT id, title, text FROM posts WHERE id = ?", post_id).Scan(
+	err := m.Conn.QueryRow("SELECT id, profile_id, title, text FROM posts WHERE id = ?", post_id).Scan(
 		&post.Id,
+		&post.ProfileId,
 		&post.Title,
 		&post.Text,
 	)
@@ -553,7 +554,7 @@ func (m *mysqlSocialNetworkRepository) GetDialog(id1 int, id2 int) ([]*domain.Me
 		id1, id2 = id2, id1
 	}
 
-	rows, err := m.Conn.Query("SELECT id_from, id_to, ts, text FROM messages WHERE dialog_id = (SELECT id from dialogs WHERE id1 = ? AND id2 = ?) ORDER BY seq DESC", id1, id2)
+	rows, err := m.Conn.Query("SELECT id_from, id_to, ts, text FROM messages WHERE dialog_id = (SELECT id from dialogs WHERE id1 = ? AND id2 = ?) ORDER BY seq", id1, id2)
 	if err != nil {
 		return nil, errors.Wrap(err, "MySQLRepository.GetDialog.Query")
 	}
@@ -572,6 +573,42 @@ func (m *mysqlSocialNetworkRepository) GetDialog(id1 int, id2 int) ([]*domain.Me
 		}
 
 		result = append(result, message)
+	}
+
+	return result, nil
+}
+
+func (m *mysqlSocialNetworkRepository) GetDialogList(id int) ([]*domain.DialogPreview, error) {
+	rows, err := m.Conn.Query(`select messages.dialog_id, messages.id_from, messages.id_to, messages.text from messages 
+															join
+																(select dialog_id, max(seq) as ms from messages where id_from = ? or id_to = ? group by dialog_id) as mm 
+															on messages.dialog_id = mm.dialog_id and messages.seq = mm.ms 
+															order by ts desc`, id, id)
+	if err != nil {
+		return nil, errors.Wrap(err, "MySQLRepository.GetDialogList.Query")
+	}
+
+	result := make([]*domain.DialogPreview, 0)
+	tempId1, tempId2 := 0, 0
+	for rows.Next() {
+		dialogPreview := &domain.DialogPreview{}
+		err = rows.Scan(
+			&dialogPreview.DialogID,
+			&tempId1,
+			&tempId2,
+			&dialogPreview.LastMessage,
+		)
+		if err != nil {
+			return nil, errors.Wrap(err, "MySQLRepository.GetDialogList.Scan")
+		}
+
+		if tempId1 != id {
+			dialogPreview.FriendID = tempId1
+		} else {
+			dialogPreview.FriendID = tempId2
+		}
+
+		result = append(result, dialogPreview)
 	}
 
 	return result, nil

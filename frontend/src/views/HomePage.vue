@@ -5,31 +5,7 @@
         <h1>My page</h1>
         <hr><br><br>
 
-        <h5>My info</h5>
-        <table class="table">
-          <tbody>
-            <tr>
-              <td>Name</td>
-              <td>{{ me.name }} {{ me.surname }}</td>
-            </tr>
-            <tr>
-              <td>Age</td>
-              <td>{{ me.age }}</td>
-            </tr>
-            <tr>
-              <td>Sex</td>
-              <td>{{ me.sex }}</td>
-            </tr>
-            <tr>
-              <td>City</td>
-              <td>{{ me.city }}</td>
-            </tr>
-            <tr>
-              <td>Interests</td>
-              <td>{{ me.interests }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <MyInfo :profile="this.me"></MyInfo>
 
         <span v-if="isFrienshipRequests">
           <hr><br>
@@ -40,8 +16,7 @@
                   {{ info.name }} {{ info.surname }}
                 </td>
                 <td>
-                  <button v-if="info.accepted === undefined"
-                    type="button" class="btn btn-sm"
+                  <button v-if="info.accepted === undefined" type="button" class="btn btn-sm"
                     @click="onFriendshipAccept(info.id, index, $event)">
                     Friendship accept
                   </button>
@@ -50,8 +25,7 @@
                   </span>
                 </td>
                 <td>
-                  <button v-if="info.accepted === undefined"
-                    type="button" class="btn btn-sm"
+                  <button v-if="info.accepted === undefined" type="button" class="btn btn-sm"
                     @click="onFriendshipDecline(info.id, index, $event)">
                     Friendship decline
                   </button>
@@ -111,11 +85,11 @@ export default {
           },
         },
       )
-      .then(result => result.data)
-      .catch((error) => {
+        .then(result => result.data)
+        .catch((error) => {
           // eslint-disable-next-line
           console.log(error);
-      });
+        });
     },
     getMyFriendRequests() {
       const path = `${process.env.VUE_APP_API_HOST || ''}/api/account/my_friend_requests`;
@@ -127,21 +101,21 @@ export default {
           },
         },
       )
-      .then((result) => {
-        if (result.status === 200) {
-          this.isFrienshipRequests = true;
-          this.friendRequests = result.data;
-        }
-        this.friendRequests.map((request, i) => {
-          this.getAccountInfo(request.friendID).then((response) => {
-            this.$set(this.friendInfo, i, response);
+        .then((result) => {
+          if (result.status === 200) {
+            this.isFrienshipRequests = true;
+            this.friendRequests = result.data;
+          }
+          this.friendRequests.map((request, i) => {
+            this.getAccountInfo(request.friendID).then((response) => {
+              this.$set(this.friendInfo, i, response);
+            });
           });
-        });
-      })
-      .catch((error) => {
+        })
+        .catch((error) => {
           // eslint-disable-next-line
           console.log(error);
-      });
+        });
     },
     friendshipAccept(id, index) {
       const path = `${process.env.VUE_APP_API_HOST || ''}/api/account/friendship_request_accept`;
@@ -156,13 +130,13 @@ export default {
           },
         },
       )
-      .then(() => {
-        this.friendInfo[index].accepted = true;
-      })
-      .catch((error) => {
+        .then(() => {
+          this.friendInfo[index].accepted = true;
+        })
+        .catch((error) => {
           // eslint-disable-next-line
           console.log(error);
-      });
+        });
     },
     friendshipDecline(id, index) {
       const path = `${process.env.VUE_APP_API_HOST || ''}/api/account/friendship_request_decline`;
@@ -177,13 +151,13 @@ export default {
           },
         },
       )
-      .then(() => {
-        this.friendInfo[index].accepted = false;
-      })
-      .catch((error) => {
+        .then(() => {
+          this.friendInfo[index].accepted = false;
+        })
+        .catch((error) => {
           // eslint-disable-next-line
           console.log(error);
-      });
+        });
     },
     onFriendshipAccept(id, index, evt) {
       evt.preventDefault();
@@ -201,6 +175,4 @@ export default {
 };
 </script>
 
-<style>
-
-</style>
+<style></style>

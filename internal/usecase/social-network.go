@@ -234,3 +234,12 @@ func (sn *socialNetworkUsecase) GetDialog(from int, to int) ([]*domain.Message, 
 
 	return result, nil
 }
+
+func (sn *socialNetworkUsecase) GetDialogList(id int) ([]*domain.DialogPreview, error) {
+	result, err := sn.repo.GetDialogList(id)
+	if err != nil {
+		return nil, errors.Wrap(err, "Usecase.GetDialogList.GetDialogList")
+	}
+
+	return result, nil
+}

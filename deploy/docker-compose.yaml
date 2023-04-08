@@ -21,7 +21,7 @@ services:
     mem_limit: 2g
     depends_on:
       - mariadb
-      - mariadb-slave
+      # - mariadb-slave
       - redis
 
   mariadb:

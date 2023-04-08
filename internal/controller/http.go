@@ -52,6 +52,7 @@ func NewSocialNetworkHandler(e *echo.Echo, snuc domain.SocialNetworkUsecase, fee
 
 	d.POST("/:id/send", handler.SendMessage)
 	d.GET("/:id/list", handler.GetDialog)
+	d.GET("/list", handler.GetDialogList)
 
 	admin := e.Group("/api/admin", middleware.BasicAuthWithConfig(middleware.BasicAuthConfig{
 		Validator: func(s1, s2 string, ctx echo.Context) (bool, error) {
@@ -295,7 +296,7 @@ func (h *SocialNetworkHandler) DeletePost(c echo.Context) error {
 func (h *SocialNetworkHandler) GetPost(c echo.Context) error {
 	post_id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.String(http.StatusBadRequest, "Bad profile id")
+		return c.String(http.StatusBadRequest, "Bad post id")
 	}
 
 	post, err := h.SNUsecase.GetPost(post_id)
@@ -371,6 +372,18 @@ func (h *SocialNetworkHandler) GetDialog(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, messages)
+}
+
+func (h *SocialNetworkHandler) GetDialogList(c echo.Context) error {
+	id := getUserId(c)
+
+	previewList, err := h.SNUsecase.GetDialogList(id)
+	if err != nil {
+		log.Println(errors.Wrap(err, "Controller.GetDialogList.Usecase.GetDialogList"))
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	return c.JSON(http.StatusOK, previewList)
 }
 
 func getUserId(c echo.Context) int {

@@ -1,21 +1,15 @@
 <template>
-  <div id="app">
-    <div id="nav" class="flex flex-row">
-      <div class="flex align-items-center justify-content-center">
-        <router-link to="/home">Homepage</router-link>
-      </div>
-      <div class="flex align-items-center justify-content-center">
-        <router-link to="/people">People</router-link>
-      </div>
-      <div class="flex align-items-end justify-content-end">
-        <span v-if="isLoggedIn">
-            <router-link to="/logout">Logout</router-link>
-        </span>
-      </div>
-    </div>
-    <br>
-    <router-view/>
-  </div>
+  <nav>
+    <router-link to="/">Homepage</router-link> |
+    <router-link to="/feed">Feed</router-link> |
+    <router-link to="/dialogs">Dialogs</router-link> |
+    <router-link to="/people">People</router-link>
+    <span v-if="isLoggedIn"> |
+      <router-link to="/logout">Logout</router-link>
+    </span>
+  </nav>
+  <br>
+  <router-view />
 </template>
 
 <script>
@@ -46,13 +40,13 @@ export default {
           .catch((error) => {
             // eslint-disable-next-line
             console.log(error);
-            if (error.response.status === 401) {
-              this.$router.push('/');
-            }
+            // if (error.response.status === 401) {
+            this.$router.push('/login');
+            // }
           },
           );
       } else {
-        this.$router.push('/');
+        this.$router.push('/login');
       }
     },
     logout() {
@@ -67,6 +61,23 @@ export default {
 
 <style>
 #app {
-  margin-top: 60px;
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-align: center;
+  color: #2c3e50;
+}
+
+nav {
+  padding: 30px;
+}
+
+nav a {
+  font-weight: bold;
+  color: #2c3e50;
+}
+
+nav a.router-link-exact-active {
+  color: #42b983;
 }
 </style>
