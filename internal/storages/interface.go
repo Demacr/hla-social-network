@@ -1,3 +1,5 @@
+//go:generate mockery --name SocialNetworkRepository
+
 package storages
 
 import "github.com/Demacr/otus-hl-socialnetwork/internal/domain"
