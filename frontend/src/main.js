@@ -21,12 +21,15 @@ import ScrollPanel from 'primevue/scrollpanel';
 
 import MyInfo from './components/MyInfo'
 
+import ToastService from 'primevue/toastservice';
+
 // const token = localStorage.getItem('token');
 
 const app = createApp(App);
 
 app.use(router);
 app.use(PrimeVue);
+app.use(ToastService);
 app.component('InputNumber', InputNumber);
 app.component('InputText', InputText);
 // eslint-disable-next-line

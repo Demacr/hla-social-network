@@ -5,7 +5,7 @@
         <h1>My page</h1>
         <hr><br><br>
 
-        <MyInfo :profile="this.me"></MyInfo>
+        <my-info :profile="this.me"></my-info>
 
         <span v-if="isFrienshipRequests">
           <hr><br>
