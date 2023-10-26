@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/Demacr/otus-hl-socialnetwork/internal/domain"
-	smock "github.com/Demacr/otus-hl-socialnetwork/internal/storages/mocks"
 	"github.com/labstack/echo/v4"
 )
 
@@ -41,7 +40,7 @@ func TestNewSocialNetworkHandler(t *testing.T) {
 
 func TestSocialNetworkHandler_Registrate(t *testing.T) {
 	e := echo.New()
-	mockRepo := smock.NewSocialNetworkRepository(t)
+	// mockRepo := smock.NewSocialNetworkRepository(t)
 
 	type fields struct {
 		SNUsecase     domain.SocialNetworkUsecase

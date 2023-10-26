@@ -132,7 +132,9 @@ func worker(count *int64, wg *sync.WaitGroup, db *sql.DB, mx *sync.Mutex) {
 				post.ProfileId = int(profileId)
 				mx.Unlock()
 
-				AddPostToDB(db, &post)
+				if err = AddPostToDB(db, &post); err != nil {
+					log.Println(err)
+				}
 			}
 		}
 		atomic.AddInt64(count, 1)
@@ -145,7 +147,9 @@ func workerFriendship(index int, count *int64, wg *sync.WaitGroup, db *sql.DB) {
 	for i := 0; i < UsersPerWorker; i++ {
 		friendshipsCount := int(rand.NormFloat64()*5 + 150)
 		for j := 0; j < friendshipsCount; j++ {
-			AddFriendshipToDB(db, index*UsersPerWorker+i, rand.Intn(Workers*UsersPerWorker)+1)
+			if err := AddFriendshipToDB(db, index*UsersPerWorker+i, rand.Intn(Workers*UsersPerWorker)+1); err != nil {
+				log.Println(err)
+			}
 		}
 
 	}

@@ -30,8 +30,8 @@ func NewFeederUsecase(db storages.SocialNetworkRepository, cache storages.CacheR
 	L:
 		for {
 			var post *domain.Post
-			select {
-			case post = <-chUpdate:
+			var ok bool
+			if post, ok = <-chUpdate; ok {
 				log.Println("DEBUG: Usecase.Feeder.ChanHandler: Get new post")
 				friendsList, err := db.GetFriends(post.ProfileId)
 				if err != nil {
@@ -55,7 +55,9 @@ func NewFeederUsecase(db storages.SocialNetworkRepository, cache storages.CacheR
 	go func() {
 		for {
 			profileId := <-chRebuild
-			fuc.rebuildFeed(profileId)
+			if err := fuc.rebuildFeed(profileId); err != nil {
+				log.Println(err)
+			}
 		}
 	}()
 
