@@ -33,7 +33,7 @@ func NewFeederUsecase(db storages.SocialNetworkRepository, cache storages.CacheR
 			var ok bool
 			if post, ok = <-chUpdate; ok {
 				log.Println("DEBUG: Usecase.Feeder.ChanHandler: Get new post")
-				friendsList, err := db.GetFriends(post.ProfileId)
+				friendsList, err := db.GetFriends(post.ProfileID)
 				if err != nil {
 					log.Println("Usecase.Feeder.Database.GetFriends")
 					continue L
@@ -42,11 +42,11 @@ func NewFeederUsecase(db storages.SocialNetworkRepository, cache storages.CacheR
 				log.Println("DEBUG: Usecase.Feeder.ChanHandler: Friendlist", friendsList)
 
 				for _, friend := range friendsList {
-					err := cache.AddToFeed(friend, post.Id)
+					err := cache.AddToFeed(friend, post.ID)
 					if err != nil {
 						log.Println(errors.Wrap(err, "Usecase.Feeder.ChanHandler"))
 					}
-					log.Printf("DEBUG: Usecase.Feeder.ChanHandler: Add %d post to %d friend\n", post.Id, friend)
+					log.Printf("DEBUG: Usecase.Feeder.ChanHandler: Add %d post to %d friend\n", post.ID, friend)
 				}
 			}
 		}
@@ -54,8 +54,8 @@ func NewFeederUsecase(db storages.SocialNetworkRepository, cache storages.CacheR
 
 	go func() {
 		for {
-			profileId := <-chRebuild
-			if err := fuc.rebuildFeed(profileId); err != nil {
+			profileID := <-chRebuild
+			if err := fuc.rebuildFeed(profileID); err != nil {
 				log.Println(err)
 			}
 		}
@@ -72,8 +72,8 @@ func (fuc *feederUsecase) GetFeedRebuildChannel() chan<- int {
 	return fuc.chRebuild
 }
 
-func (fuc *feederUsecase) GetFeedIds(profileId int) ([]int, error) {
-	result, err := fuc.cache.GetFeed(profileId)
+func (fuc *feederUsecase) GetFeedIds(profileID int) ([]int, error) {
+	result, err := fuc.cache.GetFeed(profileID)
 	if err != nil {
 		return nil, errors.Wrap(err, "Usecase.Feeder.GetFeedIds")
 	}
@@ -96,13 +96,13 @@ func (fuc *feederUsecase) RebuildFeeds() error {
 	return nil
 }
 
-func (fuc *feederUsecase) rebuildFeed(profileId int) error {
-	postIds, err := fuc.db.GetFeedLastN(profileId, 1000)
+func (fuc *feederUsecase) rebuildFeed(profileID int) error {
+	postIds, err := fuc.db.GetFeedLastN(profileID, 1000)
 	if err != nil {
 		return errors.Wrap(err, "Usecase.Feeder.RebuildFeed.Database.GetFeedLastN")
 	}
 
-	err = fuc.cache.RebuildFeed(profileId, postIds...)
+	err = fuc.cache.RebuildFeed(profileID, postIds...)
 	if err != nil {
 		return errors.Wrap(err, "Usecase.Feeder.RebuildFeed.RebuildFeed")
 	}

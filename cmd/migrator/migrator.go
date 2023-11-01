@@ -5,9 +5,8 @@ import (
 	"log"
 	"os"
 
+	_ "github.com/lib/pq"
 	"github.com/pressly/goose"
-
-	_ "github.com/go-sql-driver/mysql"
 )
 
 var (
@@ -29,7 +28,7 @@ func main() {
 
 	dbstring, command := args[0], args[1]
 
-	db, err := goose.OpenDBWithDriver("mysql", dbstring)
+	db, err := goose.OpenDBWithDriver("postgres", dbstring)
 	if err != nil {
 		log.Fatalf("goose: failed to open DB: %v\n", err)
 	}

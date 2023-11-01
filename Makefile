@@ -29,7 +29,7 @@ migrate-down: migrator
 db-lt-generator:
 	CGO_ENABLED=0 go build -a -o db-lt-generator cmd/db-lt-generator/db-lt-generator.go
 generate-fake-accounts: db-lt-generator
-	./db-lt-generator "${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(localhost)/${MYSQL_DATABASE}?parseTime=true"
+	./db-lt-generator "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost/${POSTGRES_DB}?sslmode=disable"
 
 clean-bin:
 	rm social-network || true

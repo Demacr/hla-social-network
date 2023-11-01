@@ -29,4 +29,4 @@ COPY migrations ./migrations
 COPY --from=frontend /build/dist frontend/dist/
 COPY --from=backend /build/social-network .
 COPY --from=migrator /build/migrator .
-CMD ./migrator -dir migrations/ "${MYSQL_USER}:${MYSQL_PASSWORD}@${MYSQL_HOST}/${MYSQL_DATABASE}?parseTime=true" up; ./social-network
+CMD ./migrator -dir migrations/ "host=${POSTGRES_HOST} port=5432 user=${POSTGRES_USER} password=${POSTGRES_PASSWORD} dbname=${POSTGRES_DB} sslmode=disable" up; ./social-network

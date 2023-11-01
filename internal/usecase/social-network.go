@@ -142,16 +142,16 @@ func (sn *socialNetworkUsecase) GetRelatedProfile(id, related_id int) (*domain.R
 }
 
 func (sn *socialNetworkUsecase) CreatePost(profileId int, post *domain.Post) error {
-	post.ProfileId = profileId
+	post.ProfileID = profileId
 
-	//TODO: add validation for empty posts
+	// TODO: add validation for empty posts.
 	id, err := sn.repo.CreatePost(profileId, post)
 	if err != nil {
 		err = errors.Wrap(err, "creating post")
 		return err
 	}
 
-	post.Id = id
+	post.ID = id
 
 	err = sn.cache.SetPost(post)
 	if err != nil {
@@ -164,7 +164,7 @@ func (sn *socialNetworkUsecase) CreatePost(profileId int, post *domain.Post) err
 }
 
 func (sn *socialNetworkUsecase) UpdatePost(profileId int, post *domain.Post) error {
-	post.ProfileId = profileId
+	post.ProfileID = profileId
 
 	err := sn.repo.UpdatePost(profileId, post)
 	if err != nil {
@@ -187,7 +187,7 @@ func (sn *socialNetworkUsecase) DeletePost(profileId int, post *domain.Post) err
 		return err
 	}
 
-	err = sn.cache.DeletePost(post.Id)
+	err = sn.cache.DeletePost(post.ID)
 	if err != nil {
 		return errors.Wrap(err, "Usecase.DeletePost.Cache.DeletePost")
 	}

@@ -1,8 +1,16 @@
-//go:generate mockery --name SocialNetworkRepository
-
 package storages
 
-import "github.com/Demacr/otus-hl-socialnetwork/internal/domain"
+import (
+	"time"
+
+	"github.com/Demacr/otus-hl-socialnetwork/internal/domain"
+)
+
+const (
+	MAX_OPEN_CONNECTIONS int           = 10
+	MAX_IDLE_CONNECTIONS int           = 10
+	CONNECTION_IDLE_TIME time.Duration = time.Minute * 5
+)
 
 type CacheRepository interface {
 	GetPost(post_id int) (*domain.Post, error)

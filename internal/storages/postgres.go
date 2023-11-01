@@ -11,27 +11,29 @@ import (
 	"github.com/Demacr/otus-hl-socialnetwork/internal/domain"
 	"github.com/VividCortex/mysqlerr"
 	"github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// DB struct contains sql.DB pointer of MySQL database.
-type mysqlSocialNetworkRepository struct {
+// DB struct contains sql.DB pointer of Postgres database.
+type postgresSocialNetworkRepository struct {
 	Conn   *sql.DB
 	slaves []*sql.DB
 	count  uint64
 }
 
 // NewDB creates new DB struct.
-func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepository {
-	DSNMaster := fmt.Sprintf("%s:%s@%s/%s?autocommit=true&interpolateParams=true&parseTime=true",
+func NewPostgresSocialNetworkRepository(cfg *config.PostgreSQLConfig) SocialNetworkRepository {
+	DSNMaster := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
+		cfg.Host,
+		5432,
 		cfg.Login,
 		cfg.Password,
-		cfg.Host,
 		cfg.Database,
 	)
 
-	db, err := sql.Open("mysql", DSNMaster)
+	db, err := sql.Open("postgres", DSNMaster)
 	if err != nil {
 		panic(err)
 	}
@@ -44,7 +46,6 @@ func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepos
 	db.SetMaxIdleConns(MAX_IDLE_CONNECTIONS)
 	db.SetConnMaxIdleTime(CONNECTION_IDLE_TIME)
 
-	dbSlave := db
 	slaves := []*sql.DB{}
 	if cfg.SlaveHosts != "" {
 		slaveHosts := strings.Split(cfg.SlaveHosts, ";")
@@ -56,7 +57,7 @@ func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepos
 				cfg.Database,
 			)
 
-			dbSlave, err = sql.Open("mysql", DSNSlave)
+			dbSlave, err := sql.Open("postgres", DSNSlave)
 			if err != nil {
 				panic(err)
 			}
@@ -73,10 +74,10 @@ func NewMysqlSocialNetworkRepository(cfg *config.MySQLConfig) SocialNetworkRepos
 		}
 	}
 
-	return &mysqlSocialNetworkRepository{Conn: db, slaves: slaves}
+	return &postgresSocialNetworkRepository{Conn: db, slaves: slaves}
 }
 
-func (m *mysqlSocialNetworkRepository) Slave() *sql.DB {
+func (m *postgresSocialNetworkRepository) Slave() *sql.DB {
 	if len(m.slaves) != 0 {
 		return m.slaves[atomic.AddUint64(&m.count, 1)%uint64(len(m.slaves))]
 	}
@@ -84,13 +85,13 @@ func (m *mysqlSocialNetworkRepository) Slave() *sql.DB {
 }
 
 // WriteProfile writes to DB registration profile.
-func (m *mysqlSocialNetworkRepository) WriteProfile(profile *domain.Profile) error {
+func (m *postgresSocialNetworkRepository) WriteProfile(profile *domain.Profile) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.MinCost)
 	if err != nil {
 		log.Println(err)
 	}
 
-	result, err := m.Conn.Exec("INSERT INTO users(name, surname, age, sex, interests, city, email, password) VALUES(?, ?, ?, ?, ?, ?, ?, ?);",
+	result, err := m.Conn.Exec("INSERT INTO users(name, surname, age, sex, interests, city, email, password) VALUES($1, $2, $3, $4, $5, $6, $7, $8);",
 		profile.Name,
 		profile.Surname,
 		profile.Age,
@@ -101,24 +102,20 @@ func (m *mysqlSocialNetworkRepository) WriteProfile(profile *domain.Profile) err
 		string(hash),
 	)
 	if err != nil {
-		// Check duplicate email error
-		if driverErr, ok := err.(*mysql.MySQLError); ok {
-			if driverErr.Number == mysqlerr.ER_DUP_ENTRY {
-				return errors.Wrap(driverErr, "email exists")
-			}
-		}
-		log.Println(err)
 		return err
 	}
-	if _, err := result.RowsAffected(); err != nil {
+	if rowsaffected, err := result.RowsAffected(); err != nil {
 		return err
+	} else if rowsaffected != 1 {
+		return errors.New("email exists")
 	}
+
 	return nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetProfileByEmail(email string) (*domain.Profile, error) {
+func (m *postgresSocialNetworkRepository) GetProfileByEmail(email string) (*domain.Profile, error) {
 	var profile domain.Profile
-	err := m.Slave().QueryRow("SELECT id, name, surname, age, sex, city, interests, email, password FROM users WHERE email = ?", email).Scan(
+	err := m.Slave().QueryRow("SELECT id, name, surname, age, sex, city, interests, email, password FROM users WHERE email = $1", email).Scan(
 		&profile.ID,
 		&profile.Name,
 		&profile.Surname,
@@ -136,9 +133,9 @@ func (m *mysqlSocialNetworkRepository) GetProfileByEmail(email string) (*domain.
 	return &profile, err
 }
 
-func (m *mysqlSocialNetworkRepository) GetRelatedProfileById(id, related_id int) (*domain.RelatedProfile, error) {
+func (m *postgresSocialNetworkRepository) GetRelatedProfileById(id, related_id int) (*domain.RelatedProfile, error) {
 	var profile domain.RelatedProfile
-	err := m.Slave().QueryRow("SELECT id, name, surname, age, sex, city, interests, IFNULL((SELECT true from friendship where id1=? and id2=?), false), IFNULL((SELECT true from friendship_requests where id_from=? and id_to=?), false) FROM users WHERE id = ?", related_id, id, related_id, id, id).Scan(
+	err := m.Slave().QueryRow("SELECT id, name, surname, age, sex, city, interests, COALESCE((SELECT true from friendship where id1=$1 and id2=$2), false), COALESCE((SELECT true from friendship_requests where id_from=$1 and id_to=$2), false) FROM users WHERE id = $2", related_id, id).Scan(
 		&profile.ID,
 		&profile.Name,
 		&profile.Surname,
@@ -156,19 +153,19 @@ func (m *mysqlSocialNetworkRepository) GetRelatedProfileById(id, related_id int)
 	return &profile, nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetLastProfileId() (int, error) {
+func (m *postgresSocialNetworkRepository) GetLastProfileId() (int, error) {
 	var lastId int
 	err := m.Conn.QueryRow("SELECT MAX(id) FROM users").Scan(&lastId)
 	if err != nil {
-		return lastId, errors.Wrap(err, "MySQLRepository.GetLastProfileId.QueryRow")
+		return lastId, errors.Wrap(err, "PostgresRepository.GetLastProfileId.QueryRow")
 	}
 
 	return lastId, nil
 }
 
-func (m *mysqlSocialNetworkRepository) CreateFriendRequest(id, friend_id int) (bool, error) {
+func (m *postgresSocialNetworkRepository) CreateFriendRequest(id, friend_id int) (bool, error) {
 	// TODO: check cross-request
-	result, err := m.Conn.Exec("INSERT INTO friendship_requests(id_from, id_to) VALUES(?, ?)", id, friend_id)
+	result, err := m.Conn.Exec("INSERT INTO friendship_requests(id_from, id_to) VALUES($1, $2)", id, friend_id)
 	if err != nil {
 		// Check duplicate email error
 		if driverErr, ok := err.(*mysql.MySQLError); ok {
@@ -188,11 +185,11 @@ func (m *mysqlSocialNetworkRepository) CreateFriendRequest(id, friend_id int) (b
 	return true, nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetRandomProfiles(exclude_id int) ([]domain.Profile, error) {
+func (m *postgresSocialNetworkRepository) GetRandomProfiles(exclude_id int) ([]domain.Profile, error) {
 	result := make([]domain.Profile, 0, 10)
 
 	// SELECT * from (SELECT id, name, surname, age, sex, city, interests FROM users ORDER BY rand() LIMIT 10) u left join friendship on u.id = friendship.id1 left join (select * from friendship_requests where id_from = 3) fr on u.id=fr.id_to;
-	profiles, err := m.Slave().Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE id != ? ORDER BY rand() LIMIT 10", exclude_id)
+	profiles, err := m.Slave().Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE id != $1 ORDER BY RANDOM() LIMIT 10", exclude_id)
 	if err != nil || profiles.Err() != nil {
 		return nil, errors.Wrap(err, "error during select random profiles")
 	}
@@ -218,10 +215,10 @@ func (m *mysqlSocialNetworkRepository) GetRandomProfiles(exclude_id int) ([]doma
 	return result, nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetProfilesBySearchPrefixes(first_name string, last_name string) ([]domain.Profile, error) {
+func (m *postgresSocialNetworkRepository) GetProfilesBySearchPrefixes(first_name string, last_name string) ([]domain.Profile, error) {
 	result := []domain.Profile{}
 
-	profiles, err := m.Slave().Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE name LIKE ? AND surname LIKE ? ORDER BY id ASC",
+	profiles, err := m.Slave().Query("SELECT id, name, surname, age, sex, city, interests FROM users WHERE name LIKE $1 AND surname LIKE $2 ORDER BY id ASC",
 		first_name+"%",
 		last_name+"%",
 	)
@@ -250,10 +247,10 @@ func (m *mysqlSocialNetworkRepository) GetProfilesBySearchPrefixes(first_name st
 	return result, nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetFriendRequests(id int) ([]domain.FriendRequest, error) {
+func (m *postgresSocialNetworkRepository) GetFriendRequests(id int) ([]domain.FriendRequest, error) {
 	result := []domain.FriendRequest{}
 
-	fr, err := m.Conn.Query("SELECT id_from FROM friendship_requests WHERE id_to = ?", id)
+	fr, err := m.Conn.Query("SELECT id_from FROM friendship_requests WHERE id_to = $1", id)
 	if err != nil || fr.Err() != nil {
 		return nil, errors.Wrap(err, "error during select friend requests")
 	}
@@ -273,18 +270,18 @@ func (m *mysqlSocialNetworkRepository) GetFriendRequests(id int) ([]domain.Frien
 	return result, nil
 }
 
-func (m *mysqlSocialNetworkRepository) AcceptFriendship(id, friend_id int) (bool, error) {
+func (m *postgresSocialNetworkRepository) AcceptFriendship(id, friend_id int) (bool, error) {
 	tx, err := m.Conn.Begin()
 	if err != nil {
 		return false, errors.Wrap(err, "creating transaction in accepting friendship")
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Fatalln(err)
+		if err != nil {
+			err = errors.Wrap(tx.Rollback(), "error during rollback")
 		}
 	}()
 
-	delete_result, err := tx.Exec("DELETE FROM friendship_requests WHERE id_from = ? AND id_to = ?", friend_id, id)
+	delete_result, err := tx.Exec("DELETE FROM friendship_requests WHERE id_from = $1 AND id_to = $2", friend_id, id)
 	if err != nil {
 		return false, errors.Wrap(err, "deleting request in accepting friendship")
 	}
@@ -297,12 +294,7 @@ func (m *mysqlSocialNetworkRepository) AcceptFriendship(id, friend_id int) (bool
 		return false, nil
 	}
 
-	_, err = tx.Exec("INSERT INTO friendship(id1, id2) VALUES(?, ?)", friend_id, id)
-	if err != nil {
-		return false, errors.Wrap(err, "adding friend in accepting friendship")
-	}
-
-	_, err = tx.Exec("INSERT INTO friendship(id2, id1) VALUES(?, ?)", friend_id, id)
+	_, err = tx.Exec("INSERT INTO friendship(id1, id2) VALUES($1, $2), ($2, $1)", friend_id, id)
 	if err != nil {
 		return false, errors.Wrap(err, "adding friend in accepting friendship")
 	}
@@ -314,8 +306,8 @@ func (m *mysqlSocialNetworkRepository) AcceptFriendship(id, friend_id int) (bool
 	return true, nil
 }
 
-func (m *mysqlSocialNetworkRepository) DeclineFriendship(id, friend_id int) (bool, error) {
-	delete_result, err := m.Conn.Exec("DELETE FROM friendship_requests WHERE id_from = ? AND id_to = ?", friend_id, id)
+func (m *postgresSocialNetworkRepository) DeclineFriendship(id, friend_id int) (bool, error) {
+	delete_result, err := m.Conn.Exec("DELETE FROM friendship_requests WHERE id_from = $1 AND id_to = $2", friend_id, id)
 	if err != nil {
 		return false, errors.Wrap(err, "deleting request in declining friendship")
 	}
@@ -331,10 +323,10 @@ func (m *mysqlSocialNetworkRepository) DeclineFriendship(id, friend_id int) (boo
 	return true, nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetFriends(id int) ([]int, error) {
-	rows, err := m.Conn.Query("SELECT id2 FROM friendship WHERE id1 = ?", id)
+func (m *postgresSocialNetworkRepository) GetFriends(id int) ([]int, error) {
+	rows, err := m.Conn.Query("SELECT id2 FROM friendship WHERE id1 = $1", id)
 	if err != nil || rows.Err() != nil {
-		return nil, errors.Wrap(err, "MySQLRepository.GetFriends.Query")
+		return nil, errors.Wrap(err, "PostgresRepository.GetFriends.Query")
 	}
 	defer rows.Close()
 
@@ -343,7 +335,7 @@ func (m *mysqlSocialNetworkRepository) GetFriends(id int) ([]int, error) {
 
 	for rows.Next() {
 		if err = rows.Scan(&resInt); err != nil {
-			return nil, errors.Wrap(err, "MySQLRepository.GetFriends.Scan")
+			return nil, errors.Wrap(err, "PostgresRepository.GetFriends.Scan")
 		}
 
 		result = append(result, resInt)
@@ -352,37 +344,28 @@ func (m *mysqlSocialNetworkRepository) GetFriends(id int) ([]int, error) {
 	return result, nil
 }
 
-func (m *mysqlSocialNetworkRepository) CreatePost(profile_id int, post *domain.Post) (post_id int, err error) {
-	result, err := m.Conn.Exec("INSERT INTO posts(profile_id, title, text) VALUES(?, ?, ?)", profile_id, post.Title, post.Text)
+func (m *postgresSocialNetworkRepository) CreatePost(profile_id int, post *domain.Post) (post_id int, err error) {
+	err = m.Conn.QueryRow("INSERT INTO posts(profile_id, title, text) VALUES($1, $2, $3) RETURNING id", profile_id, post.Title, post.Text).Scan(&post_id)
 	if err != nil {
 		return 0, errors.Wrapf(err, "error during creating post for user %d", profile_id)
 	}
 
-	insertId, err := result.LastInsertId()
-	if err != nil {
-		return 0, errors.Wrap(err, "MySQLRepository.CreatePost.LastInsertId")
-	}
-
-	if _, err := result.RowsAffected(); err != nil {
-		return 0, errors.Wrapf(err, "error during creating post: rowsaffected")
-	}
-
-	return int(insertId), nil
+	return post_id, nil
 }
 
-func (m *mysqlSocialNetworkRepository) UpdatePost(profile_id int, post *domain.Post) error {
+func (m *postgresSocialNetworkRepository) UpdatePost(profile_id int, post *domain.Post) error {
 	tx, err := m.Conn.Begin()
 	if err != nil {
 		return errors.Wrap(err, "error during updating post")
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Fatalln(err)
+		if err != nil {
+			err = errors.Wrap(tx.Rollback(), "error during rollback")
 		}
 	}()
 
 	var old_post domain.Post
-	err = tx.QueryRow("SELECT id, title, text FROM posts WHERE id = ? and profile_id = ?", post.ID, profile_id).Scan(
+	err = tx.QueryRow("SELECT id, title, text FROM posts WHERE id = $1 and profile_id = $2", post.ID, profile_id).Scan(
 		&old_post.ID,
 		&old_post.Title,
 		&old_post.Text,
@@ -393,7 +376,7 @@ func (m *mysqlSocialNetworkRepository) UpdatePost(profile_id int, post *domain.P
 		return errors.Wrap(err, "error during updating post")
 	}
 
-	result, err := tx.Exec("UPDATE posts SET title = ?, text = ? WHERE id = ? and profile_id = ?", post.Title, post.Text, post.ID, profile_id)
+	result, err := tx.Exec("UPDATE posts SET title = $1, text = $2 WHERE id = $3 and profile_id = $4", post.Title, post.Text, post.ID, profile_id)
 	if err != nil {
 		return errors.Wrapf(err, "error during updating post of %did with \"%s\" title and \"%s\" text", profile_id, post.Title, post.Text)
 	}
@@ -411,19 +394,19 @@ func (m *mysqlSocialNetworkRepository) UpdatePost(profile_id int, post *domain.P
 	return nil
 }
 
-func (m *mysqlSocialNetworkRepository) DeletePost(profile_id int, post *domain.Post) error {
+func (m *postgresSocialNetworkRepository) DeletePost(profile_id int, post *domain.Post) error {
 	tx, err := m.Conn.Begin()
 	if err != nil {
 		return errors.Wrap(err, "error during deleting post")
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			log.Fatalln(err)
+		if err != nil {
+			err = errors.Wrap(tx.Rollback(), "error during rollback")
 		}
 	}()
 
 	var existing_post domain.Post
-	err = tx.QueryRow("SELECT id FROM posts WHERE id = ? and profile_id = ?", post.ID, profile_id).Scan(
+	err = tx.QueryRow("SELECT id FROM posts WHERE id = $1 and profile_id = $2", post.ID, profile_id).Scan(
 		&existing_post.ID,
 	)
 	if err == sql.ErrNoRows {
@@ -432,7 +415,7 @@ func (m *mysqlSocialNetworkRepository) DeletePost(profile_id int, post *domain.P
 		return errors.Wrapf(err, "error during deleting post %d", post.ID)
 	}
 
-	result, err := tx.Exec("DELETE FROM posts WHERE id = ? and profile_id = ?", post.ID, profile_id)
+	result, err := tx.Exec("DELETE FROM posts WHERE id = $1 and profile_id = $2", post.ID, profile_id)
 	if err != nil {
 		return errors.Wrapf(err, "error during deleting post of %did", post.ID)
 	}
@@ -450,9 +433,9 @@ func (m *mysqlSocialNetworkRepository) DeletePost(profile_id int, post *domain.P
 	return nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetPost(post_id int) (*domain.Post, error) {
+func (m *postgresSocialNetworkRepository) GetPost(post_id int) (*domain.Post, error) {
 	var post domain.Post
-	err := m.Conn.QueryRow("SELECT id, profile_id, title, text FROM posts WHERE id = ?", post_id).Scan(
+	err := m.Conn.QueryRow("SELECT id, profile_id, title, text FROM posts WHERE id = $1", post_id).Scan(
 		&post.ID,
 		&post.ProfileID,
 		&post.Title,
@@ -465,10 +448,10 @@ func (m *mysqlSocialNetworkRepository) GetPost(post_id int) (*domain.Post, error
 	return &post, nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetFeedLastN(profileId int, n int) (result []int, err error) {
-	rows, err := m.Conn.Query("SELECT posts.id FROM friendship JOIN posts on friendship.id2 = posts.profile_id WHERE id1 = ? ORDER BY posts.id LIMIT ?", profileId, n)
+func (m *postgresSocialNetworkRepository) GetFeedLastN(profileId int, n int) (result []int, err error) {
+	rows, err := m.Conn.Query("SELECT posts.id FROM friendship JOIN posts on friendship.id2 = posts.profile_id WHERE id1 = $1 ORDER BY posts.id LIMIT $2", profileId, n)
 	if err != nil || rows.Err() != nil {
-		return nil, errors.Wrap(err, "MySQLRepository.GetFeedLastN.Query")
+		return nil, errors.Wrap(err, "PostgresRepository.GetFeedLastN.Query")
 	}
 	defer rows.Close()
 
@@ -478,7 +461,7 @@ func (m *mysqlSocialNetworkRepository) GetFeedLastN(profileId int, n int) (resul
 	for rows.Next() {
 		err = rows.Scan(&id)
 		if err != nil {
-			log.Println(errors.Wrap(err, "MySQLRepository.GetFeedLastN.Scan"))
+			log.Println(errors.Wrap(err, "PostgresRepository.GetFeedLastN.Scan"))
 		}
 		result = append(result, id)
 	}
@@ -487,7 +470,7 @@ func (m *mysqlSocialNetworkRepository) GetFeedLastN(profileId int, n int) (resul
 }
 
 // TODO: move out getting dialog_id and possibly cache it locally.
-func (m *mysqlSocialNetworkRepository) CreateMessage(message *domain.Message) error {
+func (m *postgresSocialNetworkRepository) CreateMessage(message *domain.Message) error {
 	id1, id2 := message.From, message.To
 	if id2 < id1 {
 		id1, id2 = id2, id1
@@ -495,63 +478,56 @@ func (m *mysqlSocialNetworkRepository) CreateMessage(message *domain.Message) er
 
 	tx, err := m.Conn.Begin()
 	if err != nil {
-		return errors.Wrap(err, "MySQLRepository.CreateMessage.Begin")
+		return errors.Wrap(err, "PostgresRepository.CreateMessage.Begin")
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
-			log.Fatalln(err)
+		if err != nil {
+			err = errors.Wrap(tx.Rollback(), "error during rollback")
 		}
 	}()
 
 	var dialogID int
-	err = tx.QueryRow("SELECT id FROM dialogs WHERE id1 = ? AND id2 = ?", id1, id2).Scan(&dialogID)
+	err = tx.QueryRow("SELECT id FROM dialogs WHERE id1 = $1 AND id2 = $2", id1, id2).Scan(&dialogID)
 	if errors.Is(err, sql.ErrNoRows) {
-		res, err := tx.Exec("INSERT INTO dialogs(id1, id2) VALUES(?, ?)", id1, id2)
-		if err != nil {
-			return errors.Wrap(err, "MySQLRepository.CreateMessage.Exec.INSERTINTODialogs")
+		if err := tx.QueryRow("INSERT INTO dialogs(id1, id2) VALUES($1, $2) RETURNING id", id1, id2).Scan(&dialogID); err != nil {
+			return errors.Wrap(err, "PostgresRepository.CreateMessage.QueryRow.INSERTINTODialogs")
 		}
-		dialogID64, err := res.LastInsertId()
-		if err != nil {
-			return errors.Wrap(err, "MySQLRepository.CreateMessage.LastInsertId")
-		}
-		dialogID = int(dialogID64)
 	} else if err != nil {
-		return errors.Wrap(err, "MySQLRepository.CreateMessage.QueryRow")
+		return errors.Wrap(err, "PostgresRepository.CreateMessage.QueryRow")
 	}
 
-	result, err := tx.Exec("INSERT INTO messages(dialog_id, id_from, id_to, seq, ts, text) VALUES(?, ?, ?, (SELECT COALESCE(MAX(seq), 0) FROM messages as m WHERE m.dialog_id = ?) + 1, ?, ?);",
+	result, err := tx.Exec("INSERT INTO messages(dialog_id, id_from, id_to, seq, ts, text) VALUES($1, $2, $3, (SELECT COALESCE(MAX(seq), 0) FROM messages as m WHERE m.dialog_id = $1) + 1, $4, $5);",
 		dialogID,
 		message.From,
 		message.To,
-		dialogID,
 		message.Timestamp,
 		message.Text,
 	)
 	if err != nil {
-		return errors.Wrap(err, "MySQLRepository.CreateMessage.Exec")
+		return errors.Wrap(err, "PostgresRepository.CreateMessage.Exec")
 	}
 
 	if rows, err := result.RowsAffected(); err != nil {
-		return errors.Wrap(err, "MySQLRepository.CreateMessage.RowsAffected")
+		return errors.Wrap(err, "PostgresRepository.CreateMessage.RowsAffected")
 	} else if rows != 1 {
-		return errors.New("MySQLRepository.CreateMessage.RowsAffected: affected rows doesn't equal to 1")
+		return errors.New("PostgresRepository.CreateMessage.RowsAffected: affected rows doesn't equal to 1")
 	}
 
 	if err = tx.Commit(); err != nil {
-		return errors.Wrap(err, "MySQLRepository.CreateMessage.Commit")
+		return errors.Wrap(err, "PostgresRepository.CreateMessage.Commit")
 	}
 
 	return nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetDialog(id1 int, id2 int) ([]*domain.Message, error) {
+func (m *postgresSocialNetworkRepository) GetDialog(id1 int, id2 int) ([]*domain.Message, error) {
 	if id1 > id2 {
 		id1, id2 = id2, id1
 	}
 
-	rows, err := m.Conn.Query("SELECT id_from, id_to, ts, text FROM messages WHERE dialog_id = (SELECT id from dialogs WHERE id1 = ? AND id2 = ?) ORDER BY seq", id1, id2)
+	rows, err := m.Conn.Query("SELECT id_from, id_to, ts, text FROM messages WHERE dialog_id = (SELECT id from dialogs WHERE id1 = $1 AND id2 = $2) ORDER BY seq", id1, id2)
 	if err != nil || rows.Err() != nil {
-		return nil, errors.Wrap(err, "MySQLRepository.GetDialog.Query")
+		return nil, errors.Wrap(err, "PostgresRepository.GetDialog.Query")
 	}
 	defer rows.Close()
 
@@ -565,7 +541,7 @@ func (m *mysqlSocialNetworkRepository) GetDialog(id1 int, id2 int) ([]*domain.Me
 			&message.Text,
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "MySQLRepository.GetDialog.Scan")
+			return nil, errors.Wrap(err, "PostgresRepository.GetDialog.Scan")
 		}
 
 		result = append(result, message)
@@ -574,14 +550,14 @@ func (m *mysqlSocialNetworkRepository) GetDialog(id1 int, id2 int) ([]*domain.Me
 	return result, nil
 }
 
-func (m *mysqlSocialNetworkRepository) GetDialogList(id int) ([]*domain.DialogPreview, error) {
+func (m *postgresSocialNetworkRepository) GetDialogList(id int) ([]*domain.DialogPreview, error) {
 	rows, err := m.Conn.Query(`select messages.dialog_id, messages.id_from, messages.id_to, messages.text from messages 
 															join
-																(select dialog_id, max(seq) as ms from messages where id_from = ? or id_to = ? group by dialog_id) as mm 
+																(select dialog_id, max(seq) as ms from messages where id_from = $1 or id_to = $1 group by dialog_id) as mm 
 															on messages.dialog_id = mm.dialog_id and messages.seq = mm.ms 
-															order by ts desc`, id, id)
+															order by ts desc`, id)
 	if err != nil || rows.Err() != nil {
-		return nil, errors.Wrap(err, "MySQLRepository.GetDialogList.Query")
+		return nil, errors.Wrap(err, "PostgresRepository.GetDialogList.Query")
 	}
 	defer rows.Close()
 
@@ -596,7 +572,7 @@ func (m *mysqlSocialNetworkRepository) GetDialogList(id int) ([]*domain.DialogPr
 			&dialogPreview.LastMessage,
 		)
 		if err != nil {
-			return nil, errors.Wrap(err, "MySQLRepository.GetDialogList.Scan")
+			return nil, errors.Wrap(err, "PostgresRepository.GetDialogList.Scan")
 		}
 
 		if tempId1 != id {

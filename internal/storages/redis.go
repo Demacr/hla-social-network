@@ -58,7 +58,7 @@ func (rc *redisCache) SetPost(post *domain.Post) error {
 		return errors.Wrap(err, "RedisCache.SetPost.json.Marshal")
 	}
 
-	if err = rc.redisClient.Set(context.TODO(), postKey(post.Id), postBytes, 0).Err(); err != nil {
+	if err = rc.redisClient.Set(context.TODO(), postKey(post.ID), postBytes, 0).Err(); err != nil {
 		return errors.Wrap(err, "RedisCache.SetPost.Set")
 	}
 

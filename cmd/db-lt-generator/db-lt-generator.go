@@ -16,6 +16,7 @@ import (
 	"github.com/bxcodec/faker/v3"
 	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -24,6 +25,11 @@ var (
 	flags          = flag.NewFlagSet("db-lt-generator", flag.ExitOnError)
 	Workers        = *flags.Int("workers", 4, "Number of workers")
 	UsersPerWorker = *flags.Int("records", 2500, "Number of records per worker")
+	DatabaseType   = *flags.String("database", "postgres", "Database type: postgres or mysql")
+
+	AddProfile    func(*sql.DB, *domain.Profile) (int64, error)
+	AddPost       func(*sql.DB, *domain.Post) error
+	AddFriendship func(*sql.DB, int, int) error
 )
 
 const (
@@ -46,7 +52,7 @@ func main() {
 
 	dbstring := args[0]
 
-	db, err := sql.Open("mysql", dbstring)
+	db, err := sql.Open(DatabaseType, dbstring)
 	if err != nil {
 		panic(err)
 	}
@@ -55,12 +61,23 @@ func main() {
 	db.SetMaxIdleConns(150)
 	db.SetConnMaxLifetime(time.Minute * 5)
 
+	switch DatabaseType {
+	case "postgres":
+		AddProfile = AddProfileToPostgres
+		AddPost = AddPostToPostgres
+		AddFriendship = AddFriendshipToPostgres
+	case "mysql":
+		AddProfile = AddRecordToDB
+		AddPost = AddPostToDB
+		AddFriendship = AddFriendshipToDB
+	}
+
 	fmt.Println("Start generating")
 
 	mx := sync.Mutex{}
 	waitCh := make(chan interface{})
 	wg := sync.WaitGroup{}
-	var count int64 = 0
+	var count int64
 
 	go func() {
 		for i := 0; i < Workers; i++ {
@@ -85,13 +102,12 @@ L:
 	}
 
 	// Friendship workers.
-	count = 0
 	waitCh = make(chan interface{})
 	go func() {
 		for i := 0; i < Workers; i++ {
 			wg.Add(1)
 			i := i
-			go workerFriendship(i, &count, &wg, db)
+			go workerFriendship(i, &wg, db)
 		}
 
 		wg.Wait()
@@ -114,7 +130,7 @@ func worker(count *int64, wg *sync.WaitGroup, db *sql.DB, mx *sync.Mutex) {
 
 		mx.Unlock()
 
-		profileId, err := AddRecordToDB(db, p)
+		profileID, err := AddProfile(db, p)
 		if err != nil {
 			log.Println(err)
 
@@ -129,10 +145,10 @@ func worker(count *int64, wg *sync.WaitGroup, db *sql.DB, mx *sync.Mutex) {
 				if err := faker.FakeData(&post); err != nil {
 					log.Println(err)
 				}
-				post.ProfileId = int(profileId)
+				post.ProfileID = int(profileID)
 				mx.Unlock()
 
-				if err = AddPostToDB(db, &post); err != nil {
+				if err = AddPost(db, &post); err != nil {
 					log.Println(err)
 				}
 			}
@@ -141,19 +157,71 @@ func worker(count *int64, wg *sync.WaitGroup, db *sql.DB, mx *sync.Mutex) {
 	}
 }
 
-func workerFriendship(index int, count *int64, wg *sync.WaitGroup, db *sql.DB) {
+func workerFriendship(index int, wg *sync.WaitGroup, db *sql.DB) {
 	defer wg.Done()
 
 	for i := 0; i < UsersPerWorker; i++ {
 		friendshipsCount := int(rand.NormFloat64()*5 + 150)
 		for j := 0; j < friendshipsCount; j++ {
-			if err := AddFriendshipToDB(db, index*UsersPerWorker+i, rand.Intn(Workers*UsersPerWorker)+1); err != nil {
+			if err := AddFriendship(db, index*UsersPerWorker+i, rand.Intn(Workers*UsersPerWorker)+1); err != nil {
 				log.Println(err)
 			}
 		}
-
 	}
 }
+
+// Postgres
+
+func AddProfileToPostgres(db *sql.DB, profile *domain.Profile) (profileID int64, err error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.MinCost)
+	if err != nil {
+		log.Println(err)
+	}
+
+	err = db.QueryRow("INSERT INTO users(name, surname, age, sex, interests, city, email, password) VALUES($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id;",
+		profile.Name,
+		profile.Surname,
+		profile.Age,
+		profile.Sex,
+		profile.Interests,
+		profile.City,
+		profile.Email,
+		string(hash),
+	).Scan(&profileID)
+	if err != nil {
+		return 0, errors.Wrap(err, "error during adding new record")
+	}
+
+	return profileID, nil
+}
+
+func AddPostToPostgres(db *sql.DB, post *domain.Post) error {
+	result, err := db.Exec("INSERT INTO posts(profile_id, title, text) values($1, $2, $3)", post.ProfileID, post.Title, post.Text)
+	if err != nil {
+		return errors.Wrap(err, "AddPostToPostgres.Exec")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "error during getting affected rows")
+	}
+	if rowsAffected < 1 {
+		return errors.Wrap(err, "not inserted")
+	}
+
+	return nil
+}
+
+func AddFriendshipToPostgres(db *sql.DB, id1 int, id2 int) error {
+	_, err := db.Exec("INSERT INTO friendship VALUES ($1, $2), ($2, $1)", id1, id2)
+	if err != nil {
+		return errors.Wrap(err, "AddFriendshipToPostgres.Exec")
+	}
+
+	return nil
+}
+
+// MySQL
 
 func AddRecordToDB(db *sql.DB, profile *domain.Profile) (int64, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(profile.Password), bcrypt.MinCost)
@@ -182,16 +250,16 @@ func AddRecordToDB(db *sql.DB, profile *domain.Profile) (int64, error) {
 		return 0, errors.Wrap(err, "error during adding new record")
 	}
 
-	profileId, err := result.LastInsertId()
+	profileID, err := result.LastInsertId()
 	if err != nil {
 		return 0, errors.Wrap(err, "error during getting affected rows")
 	}
 
-	return profileId, nil
+	return profileID, nil
 }
 
 func AddPostToDB(db *sql.DB, post *domain.Post) error {
-	result, err := db.Exec("INSERT INTO posts(profile_id, title, text) values(?, ?, ?)", post.ProfileId, post.Title, post.Text)
+	result, err := db.Exec("INSERT INTO posts(profile_id, title, text) values(?, ?, ?)", post.ProfileID, post.Title, post.Text)
 	if err != nil {
 		return errors.Wrap(err, "AddPostToDB.Exec")
 	}

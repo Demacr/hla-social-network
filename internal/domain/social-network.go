@@ -30,7 +30,7 @@ type Credentials struct {
 }
 
 type Token struct {
-	UserId uint
+	UserID uint
 	jwt.StandardClaims
 }
 
@@ -39,16 +39,16 @@ type FriendRequest struct {
 }
 
 type Post struct {
-	Id        int    `json:"id"         faker:"-"`
-	ProfileId int    `json:"profile_id" faker:"-"`
+	ID        int    `json:"id"         faker:"-"`
+	ProfileID int    `json:"profile_id" faker:"-"`
 	Title     string `json:"title"      faker:"sentence"`
 	Text      string `json:"text"       faker:"paragraph"`
 }
 
 type Message struct {
-	From      int       //`json:"from"`
-	To        int       //`json:"to"`
-	Timestamp time.Time //`json:"timestamp"`
+	From      int       // `json:"from"`
+	To        int       // `json:"to"`
+	Timestamp time.Time // `json:"timestamp"`
 	Text      string    `json:"text"`
 }
 

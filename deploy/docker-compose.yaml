@@ -20,42 +20,23 @@ services:
     cpus: 2
     mem_limit: 2g
     depends_on:
-      - mariadb
-      # - mariadb-slave
+      - postgres
       - redis
 
-  mariadb:
-    image: mariadb:10.11.2
-    container_name: mariadb
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: postgres
     env_file: ../.env.docker
     restart: always
     networks:
       - sn-net
       - sn-ext
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - social-network-db:/var/lib/mysql
-      # - ./mariadb-confs/master/my.cnf:/etc/mysql/conf.d/my.cnf
-      # - ./mariadb-confs/master/initdb.d:/docker-entrypoint-initdb.d
+      - sn-pgdb:/var/lib/postgresql/data
     cpus: 2
     mem_limit: 2g
-
-  # mariadb-slave:
-  #   image: mariadb:10.11.2
-  #   container_name: mariadb-slave
-  #   env_file: ../.env.docker
-  #   restart: always
-  #   networks:
-  #     - sn-net
-  #   volumes:
-  #     - social-network-db-slave:/var/lib/mysql
-  #     - ./mariadb-confs/slave/my.cnf:/etc/mysql/conf.d/my.cnf
-  #     - ./mariadb-confs/slave/initdb.d:/docker-entrypoint-initdb.d
-  #   cpus: 2
-  #   mem_limit: 2g
-  #   depends_on:
-  #     - mariadb
 
   redis:
     image: redis
@@ -65,8 +46,6 @@ services:
       - sn-net
     cpus: 1
     mem_limit: 1g
-    depends_on:
-    - mariadb
 
 networks:
   sn-ext:
@@ -74,5 +53,4 @@ networks:
     internal: true
 
 volumes:
-  social-network-db:
-  social-network-db-slave:
+  sn-pgdb:

@@ -28,7 +28,7 @@ func main() {
 		Browse: false,
 	}))
 
-	snRepo := storages.NewMysqlSocialNetworkRepository(&config.MySQL)
+	snRepo := storages.NewPostgresSocialNetworkRepository(&config.PostgreSQL)
 	cacheRepo := storages.NewRedisCache(&config.Redis)
 	feeduc := usecase.NewFeederUsecase(snRepo, cacheRepo)
 	snuc := usecase.NewSocialNetworkUsecase(snRepo, cacheRepo, feeduc)
